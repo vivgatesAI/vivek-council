@@ -2,6 +2,7 @@
 Vivek Council - LLM Council App using Venice API
 A modern, single-file implementation of karpathy/llm-council concept
 Deploys easily on Railway with Venice API backend
+Last updated: 2026-02-15
 """
 
 import os
