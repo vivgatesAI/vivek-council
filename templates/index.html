@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <rect width="32" height="32" rx="8" fill="url(#gradient)"/>
+                        <path d="M8 12h16M8 16h12M8 20h14" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32">
+                                <stop stop-color="#6366f1"/>
+                                <stop offset="1" stop-color="#8b5cf6"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <span class="logo-text">{{ app_name }}</span>
+                </div>
+                <div class="header-badge">
+                    <span class="pulse"></span>
+                    Powered by Venice AI
+                </div>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="council-config">
+                <div class="config-section">
+                    <h3>Council Members</h3>
+                    <div class="model-chips" id="modelChips">
+                        {% for model in model_names %}
+                        <span class="chip">{{ model }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="config-section">
+                    <h3>Chairman</h3>
+                    <div class="chairman-badge">{{ models|length + 1 }} model council</div>
+                </div>
+            </div>
+
+            <div class="chat-container" id="chatContainer">
+                <div class="welcome-message" id="welcomeMessage">
+                    <div class="welcome-icon">🏛️</div>
+                    <h2>Welcome to the Council</h2>
+                    <p>Ask your question and multiple AI models will collaborate to provide the best answer.</p>
+                    <div class="features">
+                        <div class="feature">
+                            <span class="feature-icon">💭</span>
+                            <span>First Opinions</span>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon">🔍</span>
+                            <span>Cross Review</span>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon">✨</span>
+                            <span>Final Synthesis</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="messages" id="messages"></div>
+            </div>
+
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="queryInput" 
+                        placeholder="Ask your question to the council..."
+                        rows="1"
+                        autocomplete="off"
+                    ></textarea>
+                    <button id="sendButton" class="send-button">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="progress-bar" id="progressBar" style="display: none;">
+                    <div class="progress-fill" id="progressFill"></div>
+                    <span class="progress-text" id="progressText">Processing...</span>
+                </div>
+            </div>
+        </main>
+
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>Council Tabs</h3>
+            </div>
+            <div class="tabs" id="tabs">
+                <button class="tab active" data-tab="final">
+                    <span class="tab-icon">🏆</span>
+                    Final Answer
+                </button>
+                {% for model in model_names %}
+                <button class="tab" data-tab="{{ loop.index0 }}">
+                    <span class="tab-icon">🤖</span>
+                    {{ model }}
+                </button>
+                {% endfor %}
+                <button class="tab" data-tab="reviews">
+                    <span class="tab-icon">📋</span>
+                    Reviews
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        const state = {
+            messages: [],
+            opinions: [],
+            reviews: [],
+            finalResponse: '',
+            currentTab: 'final',
+            isProcessing: false
+        };
+
+        const queryInput = document.getElementById('queryInput');
+        const sendButton = document.getElementById('sendButton');
+        const messagesContainer = document.getElementById('messages');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const welcomeMessage = document.getElementById('welcomeMessage');
+        const tabsContainer = document.getElementById('tabs');
+
+        // Auto-resize textarea
+        queryInput.addEventListener('input', () => {
+            queryInput.style.height = 'auto';
+            queryInput.style.height = Math.min(queryInput.scrollHeight, 150) + 'px';
+        });
+
+        // Handle Enter key
+        queryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendQuery();
+            }
+        });
+
+        sendButton.addEventListener('click', sendQuery);
+
+        async function sendQuery() {
+            const message = queryInput.value.trim();
+            if (!message || state.isProcessing) return;
+
+            state.isProcessing = true;
+            queryInput.value = '';
+            queryInput.disabled = true;
+            sendButton.disabled = true;
+
+            // Hide welcome, show progress
+            welcomeMessage.style.display = 'none';
+            progressBar.style.display = 'flex';
+
+            // Add user message
+            addMessage('user', message);
+            state.messages.push({ role: 'user', content: message });
+
+            try {
+                const response = await fetch('/api/council/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value);
+                    const lines = text.split('data: ').filter(line => line.trim());
+
+                    for (const line of lines) {
+                        try {
+                            const data = JSON.parse(line);
+                            
+                            if (data.error) {
+                                addMessage('error', data.error);
+                                continue;
+                            }
+
+                            // Update progress
+                            if (data.progress !== undefined) {
+                                progressFill.style.width = data.progress + '%';
+                                progressText.textContent = getStageText(data.stage, data.progress);
+                            }
+
+                            // Store opinion
+                            if (data.opinion) {
+                                state.opinions.push(data.opinion);
+                            }
+
+                            // Store review
+                            if (data.review) {
+                                state.reviews.push(data.review);
+                            }
+
+                            // Final response
+                            if (data.final) {
+                                state.finalResponse = data.final;
+                            }
+                        } catch (e) {
+                            console.error('Parse error:', e);
+                        }
+                    }
+                }
+
+                // Update UI with results
+                displayResults();
+
+            } catch (error) {
+                addMessage('error', 'Failed to connect to council: ' + error.message);
+            } finally {
+                state.isProcessing = false;
+                queryInput.disabled = false;
+                sendButton.disabled = false;
+                progressBar.style.display = 'none';
+                progressFill.style.width = '0%';
+                queryInput.focus();
+            }
+        }
+
+        function getStageText(stage, progress) {
+            if (progress < 30) return 'Getting first opinions...';
+            if (progress < 60) return 'Cross-reviewing responses...';
+            if (progress < 100) return 'Synthesizing final answer...';
+            return 'Complete!';
+        }
+
+        function addMessage(role, content) {
+            const div = document.createElement('div');
+            div.className = `message message-${role}`;
+            div.innerHTML = `
+                <div class="message-avatar">${role === 'user' ? '👤' : '🏛️'}</div>
+                <div class="message-content">
+                    <div class="message-text">${formatContent(content)}</div>
+                </div>
+            `;
+            messagesContainer.appendChild(div);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function formatContent(content) {
+            // Simple markdown-like formatting
+            return content
+                .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        }
+
+        function displayResults() {
+            // Clear messages and show structured view
+            messagesContainer.innerHTML = '';
+
+            // Add final response prominently
+            if (state.finalResponse) {
+                const finalDiv = document.createElement('div');
+                finalDiv.className = 'result-section final-result';
+                finalDiv.dataset.tab = 'final';
+                finalDiv.style.display = state.currentTab === 'final' ? 'block' : 'none';
+                finalDiv.innerHTML = `
+                    <div class="result-header">
+                        <span class="result-badge">🏆</span>
+                        <span>Final Council Answer</span>
+                    </div>
+                    <div class="result-content">${formatContent(state.finalResponse)}</div>
+                `;
+                messagesContainer.appendChild(finalDiv);
+            }
+
+            // Add opinions
+            state.opinions.forEach((opinion, i) => {
+                const div = document.createElement('div');
+                div.className = 'result-section opinion-result';
+                div.dataset.tab = i;
+                div.style.display = state.currentTab == i ? 'block' : 'none';
+                div.innerHTML = `
+                    <div class="result-header">
+                        <span class="result-badge">🤖</span>
+                        <span>${opinion.model_name}</span>
+                    </div>
+                    <div class="result-content">${formatContent(opinion.content)}</div>
+                `;
+                messagesContainer.appendChild(div);
+            });
+
+            // Add reviews
+            if (state.reviews.length > 0) {
+                const reviewsDiv = document.createElement('div');
+                reviewsDiv.className = 'result-section reviews-result';
+                reviewsDiv.dataset.tab = 'reviews';
+                reviewsDiv.style.display = state.currentTab === 'reviews' ? 'block' : 'none';
+                
+                let reviewsHTML = '<div class="reviews-grid">';
+                state.reviews.forEach(review => {
+                    reviewsHTML += `
+                        <div class="review-card">
+                            <div class="review-header">${review.model_name}</div>
+                            <div class="review-content">${formatContent(review.content)}</div>
+                        </div>
+                    `;
+                });
+                reviewsHTML += '</div>';
+                
+                reviewsDiv.innerHTML = `
+                    <div class="result-header">
+                        <span class="result-badge">📋</span>
+                        <span>Cross Reviews</span>
+                    </div>
+                    ${reviewsHTML}
+                `;
+                messagesContainer.appendChild(reviewsDiv);
+            }
+        }
+
+        // Tab switching
+        tabsContainer.addEventListener('click', (e) => {
+            const tab = e.target.closest('.tab');
+            if (!tab) return;
+
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            state.currentTab = tab.dataset.tab;
+            displayResults();
+        });
+
+        // Initialize
+        queryInput.focus();
+    </script>
+</body>
+</html>
