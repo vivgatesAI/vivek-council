@@ -422,10 +422,9 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     if app_state["venice_client"]:
-        await app_state["ven()
+        await app_state["venice_client"].close()
 
-
-app = Fastice_client"].closeAPI(
+app = FastAPI(
     title=Config.APP_NAME,
     description=Config.APP_DESCRIPTION,
     lifespan=lifespan
