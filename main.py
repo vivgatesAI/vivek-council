@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -654,7 +654,7 @@ Produce a final response synthesizing all perspectives."""
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
     
-    return generate()
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @app.get("/api/conversations")
