@@ -475,12 +475,8 @@ async def health():
 @app.get("/favicon.ico")
 async def favicon():
     """Serve favicon to avoid 404 errors"""
-    import os
-    favicon_path = os.path.join(BASE_DIR, "static", "favicon.ico")
-    if os.path.exists(favicon_path):
-        return FileResponse(favicon_path)
-    from fastapi.responses import Response
-    return Response(status_code=204)  # Return empty response if no favicon
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("", status_code=204)
 
 
 @app.post("/api/council")
