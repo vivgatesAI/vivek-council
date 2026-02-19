@@ -215,9 +215,14 @@
                             }
 
                             // Store opinion and show as card immediately
-                            if (data.opinion) {
-                                state.opinions.push(data.opinion);
-                                addOpinionCard(data.opinion);
+                            if (data.opinion_model_name && data.opinion_content) {
+                                const opinion = {
+                                    model_id: data.opinion_model_id,
+                                    model_name: data.opinion_model_name,
+                                    content: data.opinion_content
+                                };
+                                state.opinions.push(opinion);
+                                addOpinionCard(opinion);
                             }
 
                             // Store review
