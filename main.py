@@ -639,12 +639,8 @@ YOUR EVALUATION:"""
             
             # Stage 3: Final synthesis - Chairman produces final answer
             chairman_name = app_state["council_engine"]._get_model_display_name(chairman)
-            yield f"data: {json.dumps({
-                'stage': 'final', 
-                'progress': 60,
-                'current_model': chairman_name,
-                'message': chairman_name + ' is synthesizing final answer...'
-            })}\n\n"
+            msg = chairman_name + ' is synthesizing final answer...'
+            yield f"data: {json.dumps({{'stage': 'final', 'progress': 60, 'current_model': '{chairman_name}', 'message': '{msg}'}})}\n\n"
             
             summary = f"""User Query: {query.message}
 
