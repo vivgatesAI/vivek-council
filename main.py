@@ -33,14 +33,14 @@ class Config:
     
     # Council Models - Customize your council here
     COUNCIL_MODELS: List[str] = [
-        "kimi-k2-5",
+        "claude-opus-4-6",
         "deepseek-v3.2", 
         "grok-41-fast",
-        "llama-3.3-70b",
+        "kimi-k2-5",
     ]
     
     # Chairman Model - Produces final response
-    CHAIRMAN_MODEL: str = "kimi-k2-5"
+    CHAIRMAN_MODEL: str = "claude-opus-4-6"
     
     # App Settings
     APP_NAME: str = "Vivek Council"
