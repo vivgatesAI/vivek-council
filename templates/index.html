@@ -244,8 +244,12 @@
                 state.isProcessing = false;
                 queryInput.disabled = false;
                 sendButton.disabled = false;
-                progressBar.style.display = 'none';
-                progressFill.style.width = '0%';
+                // Show completion state for a moment before hiding
+                progressText.textContent = 'Complete!';
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                    progressFill.style.width = '0%';
+                }, 1500);
                 queryInput.focus();
             }
         }
