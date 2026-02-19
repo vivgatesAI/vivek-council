@@ -194,6 +194,9 @@
             if (!message || state.isProcessing) return;
 
             state.isProcessing = true;
+            state.opinions = [];
+            state.reviews = [];
+            state.finalResponse = '';
             queryInput.value = '';
             queryInput.disabled = true;
             sendButton.disabled = true;
@@ -244,17 +247,14 @@
                                 }
                             }
 
-                            // Store opinion and show placeholder card
-                            if (data.opinion_received) {
-                                // Show a loading card that will be updated later
-                                const modelName = data.current_model || 'Model';
-                                const opinion = {
-                                    model_id: data.opinion_model_id || '',
-                                    model_name: modelName,
-                                    content: 'Processing...'
-                                };
-                                state.opinions.push(opinion);
-                                addOpinionCard(opinion);
+                            // Store opinion index for tracking
+                            if (data.opinion_index !== undefined) {
+                                // Track that we got an opinion
+                            }
+                            
+                            // Store full opinion when received
+                            if (data.opinion) {
+                                state.opinions.push(data.opinion);
                             }
 
                             // Store review
@@ -266,6 +266,8 @@
                             if (data.final) {
                                 state.finalResponse = data.final;
                                 addFinalCard(data.final);
+                                // Also display all results after final response
+                                displayResults();
                             }
                         } catch (e) {
                             console.error('Parse error:', e);

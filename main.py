@@ -12,6 +12,10 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, FileResponse
@@ -32,15 +36,16 @@ class Config:
     VENICE_BASE_URL: str = "https://api.venice.ai/api/v1"
     
     # Council Models - Customize your council here
+    # Using Kimi as primary for debugging, with other strong models
     COUNCIL_MODELS: List[str] = [
-        "claude-opus-4-6",
-        "deepseek-v3.2", 
-        "grok-41-fast",
-        "kimi-k2-5",
+        "kimi-k2-5",         # Kimi K2.5 - Strong reasoning (primary for debugging)
+        "claude-sonnet-45",  # Claude Sonnet 4.5 - Balanced
+        "deepseek-v3",       # DeepSeek V3 - Efficient
+        "grok-41-fast",      # Grok 4.1 Fast - Quick responses
     ]
     
-    # Chairman Model - Produces final response
-    CHAIRMAN_MODEL: str = "claude-opus-4-6"
+    # Chairman Model - Produces final response (using Kimi for now)
+    CHAIRMAN_MODEL: str = "kimi-k2-5"
     
     # App Settings
     APP_NAME: str = "Vivek Council"
@@ -360,6 +365,7 @@ FINAL RESPONSE:"""
             "claude-opus-4-6": "Claude Opus 4.6",
             "claude-opus-45": "Claude Opus 4.5",
             "claude-sonnet-45": "Claude Sonnet 4.5",
+            "deepseek-v3": "DeepSeek V3",
             "deepseek-v3.2": "DeepSeek V3.2",
             "grok-41-fast": "Grok 4.1 Fast",
             "kimi-k2-5": "Kimi K2.5",
@@ -582,23 +588,29 @@ Be accurate, insightful, and consider multiple perspectives."""},
                     {"role": "user", "content": query.message}
                 ]
                 
-                response = await app_state["venice_client"].chat_completion(
-                    model=model_id,
-                    messages=messages,
-                    temperature=0.7,
-                    max_tokens=2000
-                )
+                try:
+                    response = await app_state["venice_client"].chat_completion(
+                        model=model_id,
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=2000
+                    )
+                    
+                    content = response["choices"][0]["message"]["content"]
+                    opinion = {
+                        "model_id": model_id,
+                        "model_name": model_name,
+                        "content": content
+                    }
+                    conv.opinions.append(opinion)
+                    
+                    msg = model_name + " submitted their opinion"
+                    yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'opinion_index': {i}, 'opinion': opinion}})}\n\n"
+                    
+                except Exception as e:
+                    error_msg = str(e).replace("'", "\\'").replace("\n", "\\n")
+                    yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': 'Error: {error_msg}', 'error': True}})}\n\n"
                 
-                content = response["choices"][0]["message"]["content"]
-                opinion = {
-                    "model_id": model_id,
-                    "model_name": model_name,
-                    "content": content
-                }
-                conv.opinions.append(opinion)
-                
-                msg = model_name + " submitted their opinion"
-                yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'opinion_received': True}})}\n\n"
                 await asyncio.sleep(1.0)
             
             _save_conversation(conv)
@@ -635,23 +647,29 @@ YOUR EVALUATION:"""
                     {"role": "user", "content": review_prompt}
                 ]
                 
-                response = await app_state["venice_client"].chat_completion(
-                    model=model_id,
-                    messages=messages,
-                    temperature=0.5,
-                    max_tokens=1500
-                )
+                try:
+                    response = await app_state["venice_client"].chat_completion(
+                        model=model_id,
+                        messages=messages,
+                        temperature=0.5,
+                        max_tokens=1500
+                    )
+                    
+                    content = response["choices"][0]["message"]["content"]
+                    review = {
+                        "model_id": model_id,
+                        "model_name": model_name,
+                        "content": content
+                    }
+                    conv.reviews.append(review)
+                    
+                    msg = model_name + " completed their review"
+                    yield f"data: {json.dumps({{'stage': 'review', 'progress': {30 + int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'review': review}})}\n\n"
+                    
+                except Exception as e:
+                    error_msg = str(e).replace("'", "\\'").replace("\n", "\\n")
+                    yield f"data: {json.dumps({{'stage': 'review', 'progress': {30 + int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': 'Error: {error_msg}', 'error': True}})}\n\n"
                 
-                content = response["choices"][0]["message"]["content"]
-                review = {
-                    "model_id": model_id,
-                    "model_name": model_name,
-                    "content": content
-                }
-                conv.reviews.append(review)
-                
-                msg = model_name + " completed their review"
-                yield f"data: {json.dumps({{'stage': 'review', 'progress': {30 + int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'review': review}})}\n\n"
                 await asyncio.sleep(1.0)
             
             _save_conversation(conv)
@@ -680,19 +698,24 @@ Produce a final response synthesizing all perspectives."""
                 {"role": "user", "content": summary}
             ]
             
-            response = await app_state["venice_client"].chat_completion(
-                model=chairman,
-                messages=messages,
-                temperature=0.6,
-                max_tokens=2500
-            )
-            
-            content = response["choices"][0]["message"]["content"]
-            conv.final_response = content
-            _save_conversation(conv)
-            
-            msg = chairman_name + ' has synthesized the final answer!'
-            yield f"data: {json.dumps({{'stage': 'complete', 'progress': 100, 'current_model': '{chairman_name}', 'message': '{msg}', 'final': content, 'conversation_id': '{conversation_id}'}})}\n\n"
+            try:
+                response = await app_state["venice_client"].chat_completion(
+                    model=chairman,
+                    messages=messages,
+                    temperature=0.6,
+                    max_tokens=2500
+                )
+                
+                content = response["choices"][0]["message"]["content"]
+                conv.final_response = content
+                _save_conversation(conv)
+                
+                msg = chairman_name + ' has synthesized the final answer!'
+                yield f"data: {json.dumps({{'stage': 'complete', 'progress': 100, 'current_model': '{chairman_name}', 'message': '{msg}', 'final': content, 'conversation_id': '{conversation_id}'}})}\n\n"
+                
+            except Exception as e:
+                error_msg = str(e).replace("'", "\\'").replace("\n", "\\n")
+                yield f"data: {json.dumps({{'stage': 'complete', 'progress': 100, 'current_model': '{chairman_name}', 'message': 'Error generating final response: {error_msg}', 'error': True}})}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
