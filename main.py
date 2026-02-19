@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -461,6 +461,12 @@ async def health():
     return {"status": "ok", "api_configured": bool(Config.VENICE_API_KEY)}
 
 
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon to avoid 404 errors"""
+    return FileResponse("static/favicon.ico")
+
+
 @app.post("/api/council")
 async def council_query(query: CouncilQuery):
     """Process a council query through all stages"""
@@ -544,10 +550,20 @@ async def council_query_stream(query: CouncilQuery, request: Request):
     
     async def generate():
         try:
-            # Stage 1: Get opinions
-            yield f"data: {json.dumps({'stage': 'opinions', 'progress': 0})}\n\n"
+            # Stage 1: Get opinions - each model provides their initial response
+            yield f"data: {json.dumps({'stage': 'opinions', 'progress': 0, 'message': 'Starting council analysis...'})}\n\n"
             
             for i, model_id in enumerate(model_ids):
+                model_name = app_state["council_engine"]._get_model_display_name(model_id)
+                
+                # Show which model is currently working
+                yield f"data: {json.dumps({
+                    'stage': 'opinions', 
+                    'progress': int((i)/len(model_ids)*30), 
+                    'current_model': model_name,
+                    'message': f'{model_name} is formulating their opinion...'
+                })}\n\n"
+                
                 messages = [
                     {"role": "system", "content": """You are a member of an LLM Council. 
 Provide a thoughtful, detailed response to the user's question.
@@ -565,17 +581,23 @@ Be accurate, insightful, and consider multiple perspectives."""},
                 content = response["choices"][0]["message"]["content"]
                 opinion = {
                     "model_id": model_id,
-                    "model_name": app_state["council_engine"]._get_model_display_name(model_id),
+                    "model_name": model_name,
                     "content": content
                 }
                 conv.opinions.append(opinion)
                 
-                yield f"data: {json.dumps({'stage': 'opinions', 'progress': int((i+1)/len(model_ids)*30), 'opinion': opinion})}\n\n"
+                yield f"data: {json.dumps({
+                    'stage': 'opinions', 
+                    'progress': int((i+1)/len(model_ids)*30), 
+                    'current_model': model_name,
+                    'message': f'{model_name} submitted their opinion',
+                    'opinion': opinion
+                })}\n\n"
             
             _save_conversation(conv)
             
-            # Stage 2: Get reviews
-            yield f"data: {json.dumps({'stage': 'review', 'progress': 30})}\n\n"
+            # Stage 2: Get reviews - each model reviews all other responses
+            yield f"data: {json.dumps({'stage': 'review', 'progress': 30, 'message': 'Starting cross-review stage...'})}\n\n"
             
             anonymized = [{"response_id": f"Response {i+1}", "content": op["content"]} 
                           for i, op in enumerate(conv.opinions)]
@@ -593,6 +615,16 @@ RESPONSES:
 YOUR EVALUATION:"""
             
             for i, model_id in enumerate(model_ids):
+                model_name = app_state["council_engine"]._get_model_display_name(model_id)
+                
+                # Show which model is reviewing
+                yield f"data: {json.dumps({
+                    'stage': 'review', 
+                    'progress': 30 + int((i)/len(model_ids)*30),
+                    'current_model': model_name,
+                    'message': f'{model_name} is reviewing other responses...'
+                })}\n\n"
+                
                 messages = [
                     {"role": "system", "content": "You are an expert evaluator."},
                     {"role": "user", "content": review_prompt}
@@ -608,17 +640,29 @@ YOUR EVALUATION:"""
                 content = response["choices"][0]["message"]["content"]
                 review = {
                     "model_id": model_id,
-                    "model_name": app_state["council_engine"]._get_model_display_name(model_id),
+                    "model_name": model_name,
                     "content": content
                 }
                 conv.reviews.append(review)
                 
-                yield f"data: {json.dumps({'stage': 'review', 'progress': 30 + int((i+1)/len(model_ids)*30), 'review': review})}\n\n"
+                yield f"data: {json.dumps({
+                    'stage': 'review', 
+                    'progress': 30 + int((i+1)/len(model_ids)*30),
+                    'current_model': model_name,
+                    'message': f'{model_name} completed their review',
+                    'review': review
+                })}\n\n"
             
             _save_conversation(conv)
             
-            # Stage 3: Final response
-            yield f"data: {json.dumps({'stage': 'final', 'progress': 60})}\n\n"
+            # Stage 3: Final synthesis - Chairman produces final answer
+            chairman_name = app_state["council_engine"]._get_model_display_name(chairman)
+            yield f"data: {json.dumps({
+                'stage': 'final', 
+                'progress': 60,
+                'current_model': chairman_name,
+                'message': f'{chairman_name} is synthesizing final answer...'
+            })}\n\n"
             
             summary = f"""User Query: {query.message}
 
@@ -649,7 +693,14 @@ Produce a final response synthesizing all perspectives."""
             conv.final_response = content
             _save_conversation(conv)
             
-            yield f"data: {json.dumps({'stage': 'complete', 'progress': 100, 'final': content, 'conversation_id': conversation_id})}\n\n"
+            yield f"data: {json.dumps({
+                'stage': 'complete', 
+                'progress': 100, 
+                'current_model': chairman_name,
+                'message': f'{chairman_name} has synthesized the final answer!',
+                'final': content, 
+                'conversation_id': conversation_id
+            })}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"

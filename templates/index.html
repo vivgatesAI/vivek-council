@@ -198,7 +198,12 @@
                             // Update progress
                             if (data.progress !== undefined) {
                                 progressFill.style.width = data.progress + '%';
-                                progressText.textContent = getStageText(data.stage, data.progress);
+                                // Use message from backend if available, otherwise fallback to default text
+                                if (data.message) {
+                                    progressText.textContent = data.message;
+                                } else {
+                                    progressText.textContent = getStageText(data.stage, data.progress);
+                                }
                             }
 
                             // Store opinion
