@@ -96,8 +96,16 @@
                     </button>
                 </div>
                 <div class="progress-bar" id="progressBar" style="display: none;">
+                    <div class="model-interaction" id="modelInteraction">
+                        <div class="model-dot" data-model="0">●</div>
+                        <div class="model-dot" data-model="1">●</div>
+                        <div class="model-dot" data-model="2">●</div>
+                        <div class="model-dot" data-model="3">●</div>
+                        <div class="interaction-line"></div>
+                    </div>
                     <div class="progress-fill" id="progressFill"></div>
                     <span class="progress-text" id="progressText">Processing...</span>
+                    <span class="timer" id="timer">00:00</span>
                 </div>
             </div>
         </main>
@@ -160,6 +168,27 @@
 
         sendButton.addEventListener('click', sendQuery);
 
+        // Timer functionality
+        let timerInterval = null;
+        let startTime = null;
+        
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                const secs = String(elapsed % 60).padStart(2, '0');
+                document.getElementById('timer').textContent = `${mins}:${secs}`;
+            }, 1000);
+        }
+        
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
         async function sendQuery() {
             const message = queryInput.value.trim();
             if (!message || state.isProcessing) return;
@@ -172,6 +201,7 @@
             // Hide welcome, show progress
             welcomeMessage.style.display = 'none';
             progressBar.style.display = 'flex';
+            startTimer();
 
             // Add user message
             addMessage('user', message);
@@ -247,11 +277,13 @@
                 state.isProcessing = false;
                 queryInput.disabled = false;
                 sendButton.disabled = false;
+                stopTimer();
                 // Show completion state for a moment before hiding
                 progressText.textContent = 'Complete!';
                 setTimeout(() => {
                     progressBar.style.display = 'none';
                     progressFill.style.width = '0%';
+                    document.getElementById('timer').textContent = '00:00';
                 }, 1500);
                 queryInput.focus();
             }

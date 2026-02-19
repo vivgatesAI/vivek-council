@@ -175,6 +175,20 @@
             margin-top: var(--space-md);
         }
         
+        .debate-steps {
+            list-style: none;
+            padding: 0;
+            margin: var(--space-md) 0;
+        }
+        
+        .debate-steps li {
+            padding: var(--space-sm) 0;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-sm);
+        }
+        
         .stage-card .model-tag {
             padding: var(--space-xs) var(--space-md);
             background: var(--bg-tertiary);
@@ -348,8 +362,15 @@
                 </div>
                 
                 <div class="stage-card">
-                    <h3><span class="stage-icon">🔍</span> Stage 2: Cross Review</h3>
-                    <p>Each model receives the other responses (anonymized so they don't know which model wrote what). They critically evaluate accuracy, insight, and clarity, then provide their own improved answer that combines the best elements from all responses.</p>
+                    <h3><span class="stage-icon">🔄</span> Stage 2: Cross Review (The Debate)</h3>
+                    <p><strong>How the debate works:</strong></p>
+                    <ul class="debate-steps">
+                        <li>📋 Each model receives all other responses <em>anonymized</em> (they don't know which model said what)</li>
+                        <li>🎯 Models evaluate responses on accuracy, insight, and clarity</li>
+                        <li>🏆 They rank the best and worst responses with explanations</li>
+                        <li>✍️ Each model writes their own improved answer incorporating the best ideas</li>
+                    </ul>
+                    <p>This creates a <strong>collaborative debate</strong> where models challenge and learn from each other!</p>
                 </div>
                 
                 <div class="stage-card">
