@@ -455,6 +455,17 @@ async def index(request: Request):
     })
 
 
+@app.get("/about", response_class=HTMLResponse)
+async def about(request: Request):
+    """About page"""
+    return templates.TemplateResponse("about.html", {
+        "request": request,
+        "app_name": Config.APP_NAME,
+        "models_list": [CouncilEngine(None)._get_model_display_name(m) for m in Config.COUNCIL_MODELS],
+        "chairman": CouncilEngine(None)._get_model_display_name(Config.CHAIRMAN_MODEL)
+    })
+
+
 @app.get("/health")
 async def health():
     """Health check"""

@@ -123,6 +123,12 @@ body {
     background-clip: text;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
 .header-badge {
     display: flex;
     align-items: center;
@@ -132,6 +138,23 @@ body {
     border-radius: var(--radius-xl);
     font-size: 0.8rem;
     color: var(--text-secondary);
+}
+
+.about-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-md);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border-radius: var(--radius-md);
+    transition: all 0.2s;
+}
+
+.about-link:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
 }
 
 .pulse {
