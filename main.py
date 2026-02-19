@@ -557,12 +557,8 @@ async def council_query_stream(query: CouncilQuery, request: Request):
                 model_name = app_state["council_engine"]._get_model_display_name(model_id)
                 
                 # Show which model is currently working
-                yield f"data: {json.dumps({
-                    'stage': 'opinions', 
-                    'progress': int((i)/len(model_ids)*30), 
-                    'current_model': model_name,
-                    'message': f'{model_name} is formulating their opinion...'
-                })}\n\n"
+                msg = model_name + " is formulating their opinion..."
+                yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}'}})}\n\n"
                 
                 messages = [
                     {"role": "system", "content": """You are a member of an LLM Council. 
@@ -586,13 +582,8 @@ Be accurate, insightful, and consider multiple perspectives."""},
                 }
                 conv.opinions.append(opinion)
                 
-                yield f"data: {json.dumps({
-                    'stage': 'opinions', 
-                    'progress': int((i+1)/len(model_ids)*30), 
-                    'current_model': model_name,
-                    'message': f'{model_name} submitted their opinion',
-                    'opinion': opinion
-                })}\n\n"
+                msg = model_name + " submitted their opinion"
+                yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'opinion': opinion}})}\n\n"
             
             _save_conversation(conv)
             
@@ -618,12 +609,8 @@ YOUR EVALUATION:"""
                 model_name = app_state["council_engine"]._get_model_display_name(model_id)
                 
                 # Show which model is reviewing
-                yield f"data: {json.dumps({
-                    'stage': 'review', 
-                    'progress': 30 + int((i)/len(model_ids)*30),
-                    'current_model': model_name,
-                    'message': f'{model_name} is reviewing other responses...'
-                })}\n\n"
+                msg = model_name + " is reviewing other responses..."
+                yield f"data: {json.dumps({{'stage': 'review', 'progress': {30 + int((i)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}'}})}\n\n"
                 
                 messages = [
                     {"role": "system", "content": "You are an expert evaluator."},
@@ -645,13 +632,8 @@ YOUR EVALUATION:"""
                 }
                 conv.reviews.append(review)
                 
-                yield f"data: {json.dumps({
-                    'stage': 'review', 
-                    'progress': 30 + int((i+1)/len(model_ids)*30),
-                    'current_model': model_name,
-                    'message': f'{model_name} completed their review',
-                    'review': review
-                })}\n\n"
+                msg = model_name + " completed their review"
+                yield f"data: {json.dumps({{'stage': 'review', 'progress': {30 + int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'review': review}})}\n\n"
             
             _save_conversation(conv)
             
@@ -661,7 +643,7 @@ YOUR EVALUATION:"""
                 'stage': 'final', 
                 'progress': 60,
                 'current_model': chairman_name,
-                'message': f'{chairman_name} is synthesizing final answer...'
+                'message': chairman_name + ' is synthesizing final answer...'
             })}\n\n"
             
             summary = f"""User Query: {query.message}
@@ -693,14 +675,8 @@ Produce a final response synthesizing all perspectives."""
             conv.final_response = content
             _save_conversation(conv)
             
-            yield f"data: {json.dumps({
-                'stage': 'complete', 
-                'progress': 100, 
-                'current_model': chairman_name,
-                'message': f'{chairman_name} has synthesized the final answer!',
-                'final': content, 
-                'conversation_id': conversation_id
-            })}\n\n"
+            msg = chairman_name + ' has synthesized the final answer!'
+            yield f"data: {json.dumps({{'stage': 'complete', 'progress': 100, 'current_model': '{chairman_name}', 'message': '{msg}', 'final': content, 'conversation_id': '{conversation_id}'}})}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
