@@ -214,9 +214,10 @@
                                 }
                             }
 
-                            // Store opinion
+                            // Store opinion and show as card immediately
                             if (data.opinion) {
                                 state.opinions.push(data.opinion);
+                                addOpinionCard(data.opinion);
                             }
 
                             // Store review
@@ -227,15 +228,13 @@
                             // Final response
                             if (data.final) {
                                 state.finalResponse = data.final;
+                                addFinalCard(data.final);
                             }
                         } catch (e) {
                             console.error('Parse error:', e);
                         }
                     }
                 }
-
-                // Update UI with results
-                displayResults();
 
             } catch (error) {
                 addMessage('error', 'Failed to connect to council: ' + error.message);
@@ -258,6 +257,35 @@
             if (progress < 60) return 'Cross-reviewing responses...';
             if (progress < 100) return 'Synthesizing final answer...';
             return 'Complete!';
+        }
+
+        function addOpinionCard(opinion) {
+            welcomeMessage.style.display = 'none';
+            const div = document.createElement('div');
+            div.className = 'result-section opinion-result';
+            div.innerHTML = `
+                <div class="result-header">
+                    <span class="result-badge">🤖</span>
+                    <span>${opinion.model_name}</span>
+                </div>
+                <div class="result-content">${formatContent(opinion.content)}</div>
+            `;
+            messagesContainer.appendChild(div);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addFinalCard(content) {
+            const div = document.createElement('div');
+            div.className = 'result-section final-result';
+            div.innerHTML = `
+                <div class="result-header">
+                    <span class="result-badge">🏆</span>
+                    <span>Final Council Answer</span>
+                </div>
+                <div class="result-content">${formatContent(content)}</div>
+            `;
+            messagesContainer.appendChild(div);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
         function addMessage(role, content) {
