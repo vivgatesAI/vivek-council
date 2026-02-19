@@ -598,7 +598,7 @@ Be accurate, insightful, and consider multiple perspectives."""},
                 conv.opinions.append(opinion)
                 
                 msg = model_name + " submitted their opinion"
-                yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'opinion_model_id': '{model_id}', 'opinion_model_name': model_name, 'opinion_content': content[:500]}})}\n\n"
+                yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'opinion_received': True}})}\n\n"
                 await asyncio.sleep(1.0)
             
             _save_conversation(conv)

@@ -244,12 +244,14 @@
                                 }
                             }
 
-                            // Store opinion and show as card immediately
-                            if (data.opinion_model_name && data.opinion_content) {
+                            // Store opinion and show placeholder card
+                            if (data.opinion_received) {
+                                // Show a loading card that will be updated later
+                                const modelName = data.current_model || 'Model';
                                 const opinion = {
-                                    model_id: data.opinion_model_id,
-                                    model_name: data.opinion_model_name,
-                                    content: data.opinion_content
+                                    model_id: data.opinion_model_id || '',
+                                    model_name: modelName,
+                                    content: 'Processing...'
                                 };
                                 state.opinions.push(opinion);
                                 addOpinionCard(opinion);
