@@ -10,10 +10,26 @@
     <link rel="stylesheet" href="/static/style.css">
     <style>
         .about-page {
-            min-height: 100vh;
+            height: 100vh;
             background: var(--bg-primary);
             overflow-y: auto;
+            overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: var(--bg-elevated) transparent;
+        }
+        
+        .about-page::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .about-page::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .about-page::-webkit-scrollbar-thumb {
+            background: var(--bg-elevated);
+            border-radius: 4px;
         }
         
         .about-hero {
