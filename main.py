@@ -563,6 +563,7 @@ async def council_query_stream(query: CouncilQuery, request: Request):
         try:
             # Stage 1: Get opinions - each model provides their initial response
             yield f"data: {json.dumps({'stage': 'opinions', 'progress': 0, 'message': 'Starting council analysis...'})}\n\n"
+            await asyncio.sleep(0.5)  # Small delay to ensure browser renders
             
             for i, model_id in enumerate(model_ids):
                 model_name = app_state["council_engine"]._get_model_display_name(model_id)
@@ -570,6 +571,7 @@ async def council_query_stream(query: CouncilQuery, request: Request):
                 # Show which model is currently working
                 msg = model_name + " is formulating their opinion..."
                 yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}'}})}\n\n"
+                await asyncio.sleep(0.3)  # Delay for browser to render
                 
                 messages = [
                     {"role": "system", "content": """You are a member of an LLM Council. 
@@ -600,6 +602,7 @@ Be accurate, insightful, and consider multiple perspectives."""},
             
             # Stage 2: Get reviews - each model reviews all other responses
             yield f"data: {json.dumps({'stage': 'review', 'progress': 30, 'message': 'Starting cross-review stage...'})}\n\n"
+            await asyncio.sleep(0.5)
             
             anonymized = [{"response_id": f"Response {i+1}", "content": op["content"]} 
                           for i, op in enumerate(conv.opinions)]
@@ -652,6 +655,7 @@ YOUR EVALUATION:"""
             chairman_name = app_state["council_engine"]._get_model_display_name(chairman)
             msg = chairman_name + ' is synthesizing final answer...'
             yield f"data: {json.dumps({{'stage': 'final', 'progress': 60, 'current_model': '{chairman_name}', 'message': '{msg}'}})}\n\n"
+            await asyncio.sleep(0.5)
             
             summary = f"""User Query: {query.message}
 
