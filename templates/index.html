@@ -58,17 +58,22 @@
             </div>
 
             <section class="analysis-deck" id="analysisDeck">
-                <div class="stage-track" id="stageTrack">
-                    <div class="stage-pill active" data-stage="opinions">1 · Opinions</div>
-                    <div class="stage-pill" data-stage="review">2 · Cross-review</div>
-                    <div class="stage-pill" data-stage="final">3 · Final synthesis</div>
+                <div class="analysis-topbar">
+                    <div class="stage-track" id="stageTrack">
+                        <div class="stage-pill active" data-stage="opinions">1 · Opinions</div>
+                        <div class="stage-pill" data-stage="review">2 · Cross-review</div>
+                        <div class="stage-pill" data-stage="final">3 · Final synthesis</div>
+                    </div>
+                    <button class="analysis-toggle" id="analysisToggle" type="button" aria-expanded="true" aria-controls="analysisDetails">Hide details</button>
                 </div>
-                <div class="analysis-summary">
-                    <div class="analysis-focus" id="analysisFocus">Ready for your question.</div>
-                    <div class="analysis-subtext" id="analysisSubtext">The council will reason step-by-step and show live progress.</div>
-                </div>
-                <div class="analysis-feed" id="analysisFeed">
-                    <div class="feed-empty">Live council events will appear here.</div>
+                <div class="analysis-details" id="analysisDetails">
+                    <div class="analysis-summary">
+                        <div class="analysis-focus" id="analysisFocus">Ready for your question.</div>
+                        <div class="analysis-subtext" id="analysisSubtext">The council will reason step-by-step and show live progress.</div>
+                    </div>
+                    <div class="analysis-feed" id="analysisFeed">
+                        <div class="feed-empty">Live council events will appear here.</div>
+                    </div>
                 </div>
             </section>
 
@@ -144,6 +149,9 @@
         const analysisSubtext = document.getElementById('analysisSubtext');
         const analysisFeed = document.getElementById('analysisFeed');
         const modelChips = document.getElementById('modelChips');
+        const analysisDeck = document.getElementById('analysisDeck');
+        const analysisToggle = document.getElementById('analysisToggle');
+        const analysisDetails = document.getElementById('analysisDetails');
 
         function normalizeModelName(name) {
             return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -153,6 +161,23 @@
             const incoming = normalizeModelName(modelName);
             if (!incoming) return -1;
             return councilModels.findIndex(name => normalizeModelName(name) === incoming);
+        }
+
+        function setAnalysisCollapsed(collapsed) {
+            analysisDeck.classList.toggle('collapsed', collapsed);
+            analysisToggle.setAttribute('aria-expanded', String(!collapsed));
+            analysisDetails.hidden = collapsed;
+            analysisToggle.textContent = collapsed ? 'Show details' : 'Hide details';
+        }
+
+        function upsertOpinion(opinion) {
+            if (!opinion) return;
+            const opinionIndex = findModelIndex(opinion.model_name);
+            if (opinionIndex === -1) {
+                state.opinions.push(opinion);
+                return;
+            }
+            state.opinions[opinionIndex] = opinion;
         }
 
         function resetAnalysisState() {
@@ -243,6 +268,10 @@
         });
         sendButton.addEventListener('click', sendQuery);
         downloadButton.addEventListener('click', downloadReport);
+        analysisToggle.addEventListener('click', () => {
+            const shouldCollapse = !analysisDeck.classList.contains('collapsed');
+            setAnalysisCollapsed(shouldCollapse);
+        });
 
         let timerInterval = null;
         function startTimer() {
@@ -272,7 +301,7 @@
             if (!message || state.isProcessing) return;
 
             state.isProcessing = true;
-            state.opinions = [];
+            state.opinions = Array(councilModels.length).fill(null);
             state.reviews = [];
             state.finalResponse = '';
             state.currentQuestion = message;
@@ -364,7 +393,10 @@
                 setActiveChip(data.current_model, active);
             }
 
-            if (data.opinion) state.opinions.push(data.opinion);
+            if (data.opinion) {
+                upsertOpinion(data.opinion);
+                displayResults();
+            }
             if (data.review) state.reviews.push(data.review);
 
             if (data.final_chunk) {
@@ -429,12 +461,17 @@
                 messagesContainer.appendChild(finalDiv);
             }
 
-            state.opinions.forEach((opinion, i) => {
+            councilModels.forEach((modelName, i) => {
+                const opinion = state.opinions[i];
                 const div = document.createElement('div');
                 div.className = 'result-section opinion-result';
                 div.dataset.tab = i;
                 div.style.display = state.currentTab == i ? 'block' : 'none';
-                div.innerHTML = `<div class="result-header"><span class="result-badge">🤖</span><span>${opinion.model_name}</span></div><div class="result-content">${formatContent(opinion.content)}</div>`;
+                if (opinion) {
+                    div.innerHTML = `<div class="result-header"><span class="result-badge">🤖</span><span>${opinion.model_name}</span></div><div class="result-content">${formatContent(opinion.content)}</div>`;
+                } else {
+                    div.innerHTML = `<div class="result-header"><span class="result-badge">🤖</span><span>${modelName}</span></div><div class="result-content"><em>${state.isProcessing ? 'Waiting for this member to finish their draft…' : 'No response captured for this member in this run.'}</em></div>`;
+                }
                 messagesContainer.appendChild(div);
             });
 
