@@ -133,6 +133,9 @@
         const modelInteraction = document.getElementById('modelInteraction');
         const downloadButton = document.getElementById('downloadButton');
         const stageTrack = document.getElementById('stageTrack');
+        const analysisFocus = document.getElementById('analysisFocus');
+        const analysisSubtext = document.getElementById('analysisSubtext');
+        const analysisFeed = document.getElementById('analysisFeed');
         const modelChips = document.getElementById('modelChips');
 
         function normalizeModelName(name) {
@@ -146,6 +149,9 @@
         }
 
         function resetAnalysisState() {
+            analysisFocus.textContent = 'Ready for your question.';
+            analysisSubtext.textContent = 'The council will reason step-by-step and show live progress.';
+            analysisFeed.innerHTML = '<div class="feed-empty">Live council events will appear here.</div>';
             stageTrack.querySelectorAll('.stage-pill').forEach((pill, idx) => {
                 pill.classList.toggle('active', idx === 0);
                 pill.classList.remove('done');
@@ -153,7 +159,7 @@
             modelChips.querySelectorAll('.chip').forEach(chip => chip.classList.remove('active'));
         }
 
-        function updateStage(stage) {
+        function updateStage(stage, message, currentModel) {
             const stages = ['opinions', 'review', 'final', 'complete'];
             const stageIndex = stages.indexOf(stage || 'opinions');
             stageTrack.querySelectorAll('.stage-pill').forEach((pill, idx) => {
@@ -162,8 +168,44 @@
                 pill.classList.toggle('done', isDone);
                 pill.classList.toggle('active', isActive);
             });
+
+            if (stage === 'complete') {
+                analysisFocus.textContent = 'Council synthesis complete.';
+                analysisSubtext.textContent = 'Final answer is ready. Review each member tab for details.';
+                return;
+            }
+
+            if (currentModel) {
+                analysisFocus.textContent = `${currentModel} is active`;
+            } else if (stage === 'opinions') {
+                analysisFocus.textContent = 'Gathering first opinions';
+            } else if (stage === 'review') {
+                analysisFocus.textContent = 'Running cross-review';
+            } else if (stage === 'final') {
+                analysisFocus.textContent = 'Synthesizing final answer';
+            }
+
+            analysisSubtext.textContent = message || getStageText(stage, 0);
         }
 
+        function addFeedItem(message, stage = 'opinions') {
+            if (!message) return;
+            const iconByStage = { opinions: '💭', review: '🔄', final: '✨', complete: '✅' };
+            const now = new Date();
+            const stamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            const item = document.createElement('div');
+            item.className = 'feed-item';
+            item.innerHTML = `<span class="feed-icon">${iconByStage[stage] || '•'}</span><span class="feed-text">${formatContent(message)}</span><span class="feed-time">${stamp}</span>`;
+
+            if (analysisFeed.querySelector('.feed-empty')) {
+                analysisFeed.innerHTML = '';
+            }
+            analysisFeed.prepend(item);
+            const maxItems = 7;
+            while (analysisFeed.children.length > maxItems) {
+                analysisFeed.removeChild(analysisFeed.lastElementChild);
+            }
+        }
 
         function setActiveChip(modelName, isActive) {
             const modelIndex = findModelIndex(modelName);
@@ -303,8 +345,12 @@
             }
 
             if (data.stage) {
-                updateStage(data.stage);
+                updateStage(data.stage, data.message, data.current_model);
             }
+            if (data.message) {
+                addFeedItem(data.message, data.stage);
+            }
+
             if (data.current_model && data.message) {
                 const active = !data.message.toLowerCase().includes('completed') && !data.message.toLowerCase().includes('submitted') && !data.message.toLowerCase().includes('synthesized');
                 setModelStatus(data.current_model, active ? 'Working' : 'Done', active);
