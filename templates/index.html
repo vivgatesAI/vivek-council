@@ -243,6 +243,13 @@
             });
         }
 
+        function setAnalysisCollapsed(collapsed) {
+            analysisDeck.classList.toggle('collapsed', collapsed);
+            analysisToggle.textContent = collapsed ? 'Show details' : 'Hide details';
+            analysisToggle.setAttribute('aria-expanded', String(!collapsed));
+            analysisDetails.setAttribute('aria-hidden', String(collapsed));
+        }
+
         function initializeVisuals() {
             modelInteraction.innerHTML = councilModels.map((name, idx) => `<div class="model-dot" data-model="${idx}" title="${name}">●</div>`).join('') + '<div class="interaction-line"></div>';
             visualStatus.innerHTML = councilModels.map((name, idx) => `
@@ -265,6 +272,7 @@
             const shouldCollapse = !analysisDeck.classList.contains('collapsed');
             setAnalysisCollapsed(shouldCollapse);
         });
+        setAnalysisCollapsed(false);
 
         let timerInterval = null;
         function startTimer() {
