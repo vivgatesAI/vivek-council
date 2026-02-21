@@ -455,15 +455,123 @@
                 .replace(/"/g, '&quot;');
         }
 
-        function reportSection(title, content, meta = '') {
-            return `<section class="brief-card"><h3>${escapeHtml(title)}</h3>${meta ? `<p class="brief-meta">${escapeHtml(meta)}</p>` : ''}<div class="brief-content">${escapeHtml(content).replace(/\n/g, '<br>')}</div></section>`;
+        function markdownToBriefHtml(content) {
+            const source = String(content || '').replace(/\r\n/g, '\n').trim();
+            if (!source) return '<p>No content captured.</p>';
+
+            const lines = source.split('\n');
+            const blocks = [];
+            let paragraph = [];
+            let listItems = [];
+            let listType = null;
+            let inCodeBlock = false;
+            let codeBuffer = [];
+
+            const flushParagraph = () => {
+                if (!paragraph.length) return;
+                blocks.push(`<p>${paragraph.join(' ').trim()}</p>`);
+                paragraph = [];
+            };
+
+            const flushList = () => {
+                if (!listItems.length || !listType) return;
+                blocks.push(`<${listType}>${listItems.map(item => `<li>${item}</li>`).join('')}</${listType}>`);
+                listItems = [];
+                listType = null;
+            };
+
+            const formatInline = (text) => {
+                return escapeHtml(text)
+                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                    .replace(/`([^`]+)`/g, '<code>$1</code>')
+                    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+            };
+
+            for (const rawLine of lines) {
+                const line = rawLine.trim();
+
+                if (line.startsWith('```')) {
+                    flushParagraph();
+                    flushList();
+                    if (inCodeBlock) {
+                        blocks.push(`<pre><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>`);
+                        codeBuffer = [];
+                        inCodeBlock = false;
+                    } else {
+                        inCodeBlock = true;
+                    }
+                    continue;
+                }
+
+                if (inCodeBlock) {
+                    codeBuffer.push(rawLine);
+                    continue;
+                }
+
+                if (!line) {
+                    flushParagraph();
+                    flushList();
+                    continue;
+                }
+
+                if (/^---+$/.test(line) || /^\*\*\*+$/.test(line)) {
+                    flushParagraph();
+                    flushList();
+                    blocks.push('<hr>');
+                    continue;
+                }
+
+                const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
+                if (headingMatch) {
+                    flushParagraph();
+                    flushList();
+                    const level = Math.min(4, headingMatch[1].length);
+                    blocks.push(`<h${level}>${formatInline(headingMatch[2])}</h${level}>`);
+                    continue;
+                }
+
+                const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
+                if (orderedMatch) {
+                    flushParagraph();
+                    if (listType && listType !== 'ol') flushList();
+                    listType = 'ol';
+                    listItems.push(formatInline(orderedMatch[1]));
+                    continue;
+                }
+
+                const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+                if (bulletMatch) {
+                    flushParagraph();
+                    if (listType && listType !== 'ul') flushList();
+                    listType = 'ul';
+                    listItems.push(formatInline(bulletMatch[1]));
+                    continue;
+                }
+
+                flushList();
+                paragraph.push(formatInline(line));
+            }
+
+            flushParagraph();
+            flushList();
+
+            if (inCodeBlock && codeBuffer.length) {
+                blocks.push(`<pre><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>`);
+            }
+
+            return blocks.join('');
+        }
+
+        function reportSection(title, content, meta = '', tone = 'sun') {
+            return `<section class="brief-card tone-${tone}"><h3>${escapeHtml(title)}</h3>${meta ? `<p class="brief-meta">${escapeHtml(meta)}</p>` : ''}<div class="brief-content">${markdownToBriefHtml(content)}</div></section>`;
         }
 
         function buildExecutiveBriefHtml() {
             const now = new Date();
-            const finalSection = reportSection('Final Recommendation', state.finalResponse || 'No final response captured yet.', 'Chairman synthesis');
-            const opinions = state.opinions.map((op, idx) => reportSection(`Council Member ${idx + 1}: ${op.model_name}`, op.content)).join('');
-            const reviews = state.reviews.map((rev, idx) => reportSection(`Review ${idx + 1}: ${rev.model_name}`, rev.content)).join('');
+            const finalSection = reportSection('Final Recommendation', state.finalResponse || 'No final response captured yet.', 'Chairman synthesis', 'teal');
+            const opinions = state.opinions.map((op, idx) => reportSection(`Council Member ${idx + 1}: ${op.model_name}`, op.content, 'First opinions', idx % 2 === 0 ? 'sun' : 'cocoa')).join('');
+            const reviews = state.reviews.map((rev, idx) => reportSection(`Review ${idx + 1}: ${rev.model_name}`, rev.content, 'Cross-review insight', idx % 2 === 0 ? 'olive' : 'teal')).join('');
 
             return `<!DOCTYPE html>
 <html lang="en">
@@ -472,30 +580,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Vivek Council Executive Brief</title>
 <style>
-:root { --ink:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --accent:#1d4ed8; --accent2:#7c3aed; }
-*{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(170deg,#eef2ff 0%,#f8fafc 40%,#ecfeff 100%);color:var(--ink);}
-.wrap{max-width:980px;margin:0 auto;padding:40px 24px 80px;}
-.hero{background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;padding:32px;border-radius:18px;box-shadow:0 20px 45px rgba(30,64,175,.25);margin-bottom:24px;}
-.hero h1{margin:0 0 10px;font-size:30px} .hero p{margin:6px 0 0;opacity:.95}
-.grid{display:grid;gap:18px}
-.brief-card{background:var(--card);border:1px solid #dbeafe;border-radius:16px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
-.brief-card h3{margin:0 0 8px;color:#1e3a8a;font-size:18px}.brief-meta{margin:0 0 12px;color:var(--muted);font-size:13px}.brief-content{line-height:1.7;color:#0f172a;font-size:15px;white-space:normal}
-.section-title{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#334155;margin:28px 0 8px;font-weight:700}
-.footer{margin-top:28px;color:#64748b;font-size:12px;text-align:right}
+:root { --ink:#1f2937; --muted:#5b5564; --paper:#f6efe1; --sand:#e8dcc2; --sun:#f0a43a; --teal:#0f766e; --olive:#6b7c36; --cocoa:#6d4c41; --cream:#fffaf0; }
+*{box-sizing:border-box}
+body{margin:0;font-family:"Trebuchet MS","Avenir Next",Avenir,"Gill Sans",sans-serif;background:radial-gradient(circle at 20% 0%, #fff7e6 0%, #f1e6d0 40%, #e8dcc2 100%);color:var(--ink)}
+.wrap{max-width:1080px;margin:0 auto;padding:34px 24px 80px;position:relative}
+.wrap::before,.wrap::after{content:"";position:fixed;width:170px;height:170px;border-radius:50%;z-index:0;opacity:.18;pointer-events:none}
+.wrap::before{top:40px;left:-55px;background:var(--sun)}
+.wrap::after{bottom:30px;right:-40px;background:var(--teal)}
+.hero{position:relative;z-index:1;background:linear-gradient(125deg,#0f766e 0%,#115e59 35%,#f0a43a 100%);color:#fff;border-radius:26px;padding:34px 38px;box-shadow:0 16px 0 rgba(31,41,55,.16),0 32px 55px rgba(15,23,42,.18);margin-bottom:28px;overflow:hidden}
+.hero::after{content:"";position:absolute;inset:-30% auto auto 62%;width:260px;height:260px;border-radius:50%;background:rgba(255,250,240,.18)}
+.hero h1{margin:0 0 14px;font-size:46px;line-height:1.1;letter-spacing:.02em;font-weight:800}
+.hero .meta{font-size:24px;line-height:1.5;max-width:90%;position:relative;z-index:1}
+.hero .meta strong{color:#fff7d6}
+.grid{position:relative;z-index:1;display:grid;gap:16px}
+.brief-card{border-radius:20px;padding:24px 24px 22px;border:2px solid rgba(31,41,55,.12);background:var(--cream);box-shadow:0 12px 24px rgba(31,41,55,.08)}
+.brief-card h3{margin:0 0 6px;font-size:25px;letter-spacing:.015em}
+.brief-meta{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.tone-sun{border-left:12px solid var(--sun)} .tone-teal{border-left:12px solid var(--teal)} .tone-olive{border-left:12px solid var(--olive)} .tone-cocoa{border-left:12px solid var(--cocoa)}
+.brief-content{font-size:18px;line-height:1.72}
+.brief-content p{margin:0 0 14px}
+.brief-content h1,.brief-content h2,.brief-content h3,.brief-content h4{margin:18px 0 10px;line-height:1.3;color:#111827}
+.brief-content h1{font-size:34px}.brief-content h2{font-size:30px}.brief-content h3{font-size:25px}.brief-content h4{font-size:21px}
+.brief-content ul,.brief-content ol{margin:0 0 14px 24px;padding:0}
+.brief-content li{margin:5px 0}
+.brief-content code{background:#efe4cd;padding:2px 6px;border-radius:6px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em}
+.brief-content pre{margin:0 0 14px;background:#1f2937;color:#f9fafb;padding:14px;border-radius:12px;overflow:auto}
+.brief-content pre code{background:transparent;padding:0;color:inherit}
+.brief-content hr{border:none;border-top:3px dashed rgba(31,41,55,.25);margin:18px 0}
+.brief-content a{color:#0f766e;text-decoration:underline}
+.section-title{position:relative;z-index:1;margin:28px 0 10px;font-size:13px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#374151}
+.footer{position:relative;z-index:1;margin-top:30px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;text-align:right}
+@media (max-width: 720px){.hero h1{font-size:34px}.hero .meta{font-size:20px}.brief-content{font-size:16px}.brief-card h3{font-size:21px}}
 </style>
 </head>
 <body>
 <div class="wrap">
     <div class="hero">
         <h1>Vivek Council — Executive Brief</h1>
-        <p><strong>Prompt:</strong> ${escapeHtml(state.currentQuestion || 'N/A')}</p>
-        <p>Generated: ${escapeHtml(now.toLocaleString())}</p>
+        <div class="meta"><p><strong>Prompt:</strong> ${escapeHtml(state.currentQuestion || 'N/A')}</p><p><strong>Generated:</strong> ${escapeHtml(now.toLocaleString())}</p></div>
     </div>
     <div class="grid">${finalSection}</div>
     <div class="section-title">Council Member Perspectives</div>
-    <div class="grid">${opinions || '<section class="brief-card"><div class="brief-content">No member opinions captured.</div></section>'}</div>
+    <div class="grid">${opinions || '<section class="brief-card tone-sun"><div class="brief-content"><p>No member opinions captured.</p></div></section>'}</div>
     <div class="section-title">Cross-Reviews</div>
-    <div class="grid">${reviews || '<section class="brief-card"><div class="brief-content">No review content captured.</div></section>'}</div>
+    <div class="grid">${reviews || '<section class="brief-card tone-olive"><div class="brief-content"><p>No review content captured.</p></div></section>'}</div>
     <div class="footer">Prepared by Vivek Council</div>
 </div>
 </body>
