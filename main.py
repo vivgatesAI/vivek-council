@@ -39,9 +39,9 @@ class Config:
     # Note: kimi-k2-5 is Private Beta and may be unavailable - using stable alternatives
     COUNCIL_MODELS: List[str] = [
         "minimax-m25",              # MiniMax M2.5 - Your default (reliable)
-        "claude-sonnet-45",         # Claude Sonnet 4.5 - Balanced
+        "claude-sonnet-4-6",        # Claude Sonnet 4.6 - Balanced
         "gemini-3-flash-preview",   # Google Gemini 3 Flash Preview
-        "grok-41-fast",             # Grok 4.1 Fast - Quick responses
+        "zai-org-glm-5",            # GLM 5 - Fast and reliable
     ]
     
     # Chairman Model - Produces final response
@@ -364,10 +364,11 @@ FINAL RESPONSE:"""
         names = {
             "claude-opus-4-6": "Claude Opus 4.6",
             "claude-opus-45": "Claude Opus 4.5",
-            "claude-sonnet-45": "Claude Sonnet 4.5",
+            "claude-sonnet-4-6": "Claude Sonnet 4.6",
             "deepseek-v3": "DeepSeek V3",
             "deepseek-v3.2": "DeepSeek V3.2",
             "grok-41-fast": "Grok 4.1 Fast",
+            "zai-org-glm-5": "GLM 5",
             "kimi-k2-5": "Kimi K2.5",
             "openai-gpt-52": "GPT-5.2",
             "llama-3.3-70b": "Llama 3.3 70B",
@@ -757,6 +758,24 @@ Produce a final response synthesizing all perspectives."""
                 content = response["choices"][0]["message"]["content"]
                 conv.final_response = content
                 _save_conversation(conv)
+
+                # Stream the chairman response in chunks for a more live experience
+                chunk_size = 120
+                total_chunks = max(1, (len(content) + chunk_size - 1) // chunk_size)
+                for chunk_index in range(total_chunks):
+                    start = chunk_index * chunk_size
+                    end = start + chunk_size
+                    chunk = content[start:end]
+                    chunk_progress = 60 + int(((chunk_index + 1) / total_chunks) * 35)
+                    chunk_update = {
+                        "stage": "final",
+                        "progress": chunk_progress,
+                        "current_model": chairman_name,
+                        "message": chairman_name + " is writing the final answer...",
+                        "final_chunk": chunk,
+                    }
+                    yield f"data: {json.dumps(chunk_update)}\n\n"
+                    await asyncio.sleep(0.03)
                 
                 msg = chairman_name + ' has synthesized the final answer!'
                 completion_update = {
