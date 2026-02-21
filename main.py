@@ -579,7 +579,13 @@ async def council_query_stream(query: CouncilQuery, request: Request):
                 
                 # Show which model is currently working
                 msg = model_name + " is formulating their opinion..."
-                yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}'}})}\n\n"
+                status_update = {
+                    "stage": "opinions",
+                    "progress": int(i / len(model_ids) * 30),
+                    "current_model": model_name,
+                    "message": msg,
+                }
+                yield f"data: {json.dumps(status_update)}\n\n"
                 await asyncio.sleep(1.0)  # Delay for browser to render
                 
                 messages = [
@@ -606,11 +612,26 @@ Be accurate, insightful, and consider multiple perspectives."""},
                     conv.opinions.append(opinion)
                     
                     msg = model_name + " submitted their opinion"
-                    yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'opinion_index': {i}, 'opinion': opinion}})}\n\n"
+                    opinion_update = {
+                        "stage": "opinions",
+                        "progress": int((i + 1) / len(model_ids) * 30),
+                        "current_model": model_name,
+                        "message": msg,
+                        "opinion_index": i,
+                        "opinion": opinion,
+                    }
+                    yield f"data: {json.dumps(opinion_update)}\n\n"
                     
                 except Exception as e:
                     error_msg = str(e).replace("'", "\\'").replace("\n", "\\n")
-                    yield f"data: {json.dumps({{'stage': 'opinions', 'progress': {int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': 'Error: {error_msg}', 'error': True}})}\n\n"
+                    error_update = {
+                        "stage": "opinions",
+                        "progress": int((i + 1) / len(model_ids) * 30),
+                        "current_model": model_name,
+                        "message": f"Error: {error_msg}",
+                        "error": True,
+                    }
+                    yield f"data: {json.dumps(error_update)}\n\n"
                 
                 await asyncio.sleep(1.0)
             
@@ -640,7 +661,13 @@ YOUR EVALUATION:"""
                 
                 # Show which model is reviewing
                 msg = model_name + " is reviewing other responses..."
-                yield f"data: {json.dumps({{'stage': 'review', 'progress': {30 + int((i)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}'}})}\n\n"
+                review_status_update = {
+                    "stage": "review",
+                    "progress": 30 + int(i / len(model_ids) * 30),
+                    "current_model": model_name,
+                    "message": msg,
+                }
+                yield f"data: {json.dumps(review_status_update)}\n\n"
                 await asyncio.sleep(1.0)
                 
                 messages = [
@@ -665,11 +692,25 @@ YOUR EVALUATION:"""
                     conv.reviews.append(review)
                     
                     msg = model_name + " completed their review"
-                    yield f"data: {json.dumps({{'stage': 'review', 'progress': {30 + int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': '{msg}', 'review': review}})}\n\n"
+                    review_update = {
+                        "stage": "review",
+                        "progress": 30 + int((i + 1) / len(model_ids) * 30),
+                        "current_model": model_name,
+                        "message": msg,
+                        "review": review,
+                    }
+                    yield f"data: {json.dumps(review_update)}\n\n"
                     
                 except Exception as e:
                     error_msg = str(e).replace("'", "\\'").replace("\n", "\\n")
-                    yield f"data: {json.dumps({{'stage': 'review', 'progress': {30 + int((i+1)/len(model_ids)*30)}, 'current_model': '{model_name}', 'message': 'Error: {error_msg}', 'error': True}})}\n\n"
+                    review_error_update = {
+                        "stage": "review",
+                        "progress": 30 + int((i + 1) / len(model_ids) * 30),
+                        "current_model": model_name,
+                        "message": f"Error: {error_msg}",
+                        "error": True,
+                    }
+                    yield f"data: {json.dumps(review_error_update)}\n\n"
                 
                 await asyncio.sleep(1.0)
             
@@ -678,7 +719,13 @@ YOUR EVALUATION:"""
             # Stage 3: Final synthesis - Chairman produces final answer
             chairman_name = app_state["council_engine"]._get_model_display_name(chairman)
             msg = chairman_name + ' is synthesizing final answer...'
-            yield f"data: {json.dumps({{'stage': 'final', 'progress': 60, 'current_model': '{chairman_name}', 'message': '{msg}'}})}\n\n"
+            final_status_update = {
+                "stage": "final",
+                "progress": 60,
+                "current_model": chairman_name,
+                "message": msg,
+            }
+            yield f"data: {json.dumps(final_status_update)}\n\n"
             await asyncio.sleep(1.5)
             
             summary = f"""User Query: {query.message}
@@ -712,11 +759,26 @@ Produce a final response synthesizing all perspectives."""
                 _save_conversation(conv)
                 
                 msg = chairman_name + ' has synthesized the final answer!'
-                yield f"data: {json.dumps({{'stage': 'complete', 'progress': 100, 'current_model': '{chairman_name}', 'message': '{msg}', 'final': content, 'conversation_id': '{conversation_id}'}})}\n\n"
+                completion_update = {
+                    "stage": "complete",
+                    "progress": 100,
+                    "current_model": chairman_name,
+                    "message": msg,
+                    "final": content,
+                    "conversation_id": conversation_id,
+                }
+                yield f"data: {json.dumps(completion_update)}\n\n"
                 
             except Exception as e:
                 error_msg = str(e).replace("'", "\\'").replace("\n", "\\n")
-                yield f"data: {json.dumps({{'stage': 'complete', 'progress': 100, 'current_model': '{chairman_name}', 'message': 'Error generating final response: {error_msg}', 'error': True}})}\n\n"
+                completion_error_update = {
+                    "stage": "complete",
+                    "progress": 100,
+                    "current_model": chairman_name,
+                    "message": f"Error generating final response: {error_msg}",
+                    "error": True,
+                }
+                yield f"data: {json.dumps(completion_error_update)}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
