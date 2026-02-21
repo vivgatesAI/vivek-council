@@ -38,14 +38,13 @@ class Config:
     # Council Models - Updated Feb 2026 with confirmed working models
     # Note: kimi-k2-5 is Private Beta and may be unavailable - using stable alternatives
     COUNCIL_MODELS: List[str] = [
-        "minimax-m25",              # MiniMax M2.5 - Your default (reliable)
-        "claude-sonnet-4-6",        # Claude Sonnet 4.6 - Balanced
+        "minimax-m25",              # MiniMax M2.5 - Reliable
         "gemini-3-flash-preview",   # Google Gemini 3 Flash Preview
         "zai-org-glm-5",            # GLM 5 - Fast and reliable
     ]
     
     # Chairman Model - Produces final response
-    CHAIRMAN_MODEL: str = "minimax-m25"
+    CHAIRMAN_MODEL: str = "openai-gpt-52"
     
     # App Settings
     APP_NAME: str = "Vivek Council"

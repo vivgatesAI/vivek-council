@@ -63,11 +63,6 @@
                     <div class="stage-pill" data-stage="review">2 · Cross-review</div>
                     <div class="stage-pill" data-stage="final">3 · Final synthesis</div>
                 </div>
-                <div class="analysis-meta">
-                    <div class="analysis-focus" id="analysisFocus">Ready for your question.</div>
-                    <div class="analysis-subtext" id="analysisSubtext">The council will reason step-by-step and show live progress.</div>
-                </div>
-                <div class="analysis-feed" id="analysisFeed"></div>
             </section>
 
             <div class="chat-container" id="chatContainer">
@@ -94,6 +89,9 @@
                         </svg>
                     </button>
                 </div>
+                <div class="export-row">
+                    <button id="downloadButton" class="download-button" disabled>Download Executive Brief (.html)</button>
+                </div>
                 <div class="progress-bar" id="progressBar" style="display: none;">
                     <div class="model-interaction" id="modelInteraction"></div>
                     <div class="progress-fill" id="progressFill"></div>
@@ -101,9 +99,6 @@
                     <span class="timer" id="timer">00:00</span>
                 </div>
                 <div class="visual-status" id="visualStatus"></div>
-                <div class="export-row">
-                    <button id="downloadButton" class="download-button" disabled>Download Executive Brief (.html)</button>
-                </div>
             </div>
         </main>
 

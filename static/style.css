@@ -212,7 +212,8 @@ body {
     display: flex;
     flex-direction: column;
     padding: var(--space-lg);
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* Council Config */
@@ -515,6 +516,9 @@ body {
     backdrop-filter: blur(10px);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-subtle);
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
 }
 
 .input-wrapper {
@@ -927,9 +931,7 @@ body {
     background: linear-gradient(135deg, rgba(17, 24, 39, 0.88), rgba(30, 41, 59, 0.78));
     border: 1px solid rgba(99, 102, 241, 0.24);
     border-radius: 18px;
-    padding: 14px;
-    display: grid;
-    gap: 10px;
+    padding: 10px 14px;
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.3);
 }
 
@@ -964,50 +966,6 @@ body {
     background: rgba(22, 163, 74, 0.18);
 }
 
-.analysis-meta {
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 14px;
-    padding: 12px 14px;
-}
-
-.analysis-focus {
-    font-size: 0.98rem;
-    font-weight: 700;
-    color: #f8fafc;
-}
-
-.analysis-subtext {
-    margin-top: 4px;
-    color: #94a3b8;
-    font-size: 0.84rem;
-}
-
-.analysis-feed {
-    display: grid;
-    gap: 8px;
-}
-
-.feed-empty {
-    color: #64748b;
-    font-size: 0.82rem;
-    padding: 6px 2px;
-}
-
-.feed-item {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 8px;
-    background: rgba(2, 6, 23, 0.45);
-    border: 1px solid rgba(148, 163, 184, 0.15);
-    border-radius: 10px;
-    padding: 8px 10px;
-}
-
-.feed-icon { font-size: 0.9rem; }
-.feed-text { color: #e2e8f0; font-size: 0.8rem; }
-.feed-time { color: #94a3b8; font-size: 0.72rem; font-family: var(--font-mono); }
 
 /* Better result presentation */
 .result-section {
@@ -1041,9 +999,6 @@ body {
 }
 
 @media (max-width: 640px) {
-    .analysis-deck { padding: 10px; gap: 8px; }
+    .analysis-deck { padding: 10px; }
     .stage-track { grid-template-columns: 1fr; }
-    .analysis-focus { font-size: 0.9rem; }
-    .feed-item { grid-template-columns: auto 1fr; }
-    .feed-time { grid-column: 2; }
 }
