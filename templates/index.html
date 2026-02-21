@@ -123,7 +123,7 @@
         const councilModels = {{ model_names|tojson }};
         const state = {
             messages: [], opinions: [], reviews: [], finalResponse: '', currentTab: 'final',
-            isProcessing: false, activeModel: '', stage: 'idle', streamBuffer: '', currentQuestion: '', feedEvents: []
+            isProcessing: false, activeModel: '', stage: 'idle', streamBuffer: '', currentQuestion: ''
         };
 
         const queryInput = document.getElementById('queryInput');
@@ -137,10 +137,6 @@
         const visualStatus = document.getElementById('visualStatus');
         const modelInteraction = document.getElementById('modelInteraction');
         const downloadButton = document.getElementById('downloadButton');
-        const stageTrack = document.getElementById('stageTrack');
-        const analysisFocus = document.getElementById('analysisFocus');
-        const analysisSubtext = document.getElementById('analysisSubtext');
-        const analysisFeed = document.getElementById('analysisFeed');
 
         function initializeVisuals() {
             modelInteraction.innerHTML = councilModels.map((name, idx) => `<div class="model-dot" data-model="${idx}" title="${name}">●</div>`).join('') + '<div class="interaction-line"></div>';
@@ -201,11 +197,6 @@
             progressBar.style.display = 'flex';
             visualStatus.style.display = 'grid';
             initializeVisuals();
-            setStageState('opinions');
-            state.feedEvents = [];
-            renderAnalysisFeed();
-            analysisFocus.textContent = 'Council initialized';
-            analysisSubtext.textContent = 'Gathering first perspectives from each model.';
             startTimer();
 
             addMessage('user', message);
@@ -270,15 +261,11 @@
             if (data.progress !== undefined) {
                 progressFill.style.width = data.progress + '%';
                 progressText.textContent = data.message || getStageText(data.stage, data.progress);
-                if (data.stage) setStageState(data.stage);
             }
 
             if (data.current_model && data.message) {
                 const active = !data.message.toLowerCase().includes('completed') && !data.message.toLowerCase().includes('submitted') && !data.message.toLowerCase().includes('synthesized');
                 setModelStatus(data.current_model, active ? 'Working' : 'Done', active);
-                analysisFocus.textContent = data.current_model;
-                analysisSubtext.textContent = data.message;
-                pushFeedEvent(data.stage || 'update', `${data.current_model}: ${data.message}`);
             }
 
             if (data.opinion) state.opinions.push(data.opinion);
@@ -293,9 +280,6 @@
                 state.finalResponse = data.final;
                 displayResults();
                 downloadButton.disabled = false;
-                analysisFocus.textContent = 'Council complete';
-                analysisSubtext.textContent = 'Final recommendation ready. You can review tabs or download the executive brief.';
-                pushFeedEvent('complete', 'Final recommendation delivered successfully.');
             }
         }
 
@@ -312,39 +296,6 @@
                 <div class="result-header"><span class="result-badge">🏆</span><span>Chairman is writing...</span></div>
                 <div class="result-content">${formatContent(state.finalResponse)}<span class="typing-cursor">▌</span></div>
             `;
-        }
-
-
-        function setStageState(stage) {
-            const normalized = stage === 'complete' ? 'final' : stage;
-            stageTrack.querySelectorAll('.stage-pill').forEach((pill) => {
-                const pillStage = pill.dataset.stage;
-                const order = ['opinions', 'review', 'final'];
-                const activeIndex = order.indexOf(normalized);
-                const pillIndex = order.indexOf(pillStage);
-                pill.classList.toggle('active', pillStage === normalized);
-                pill.classList.toggle('done', pillIndex < activeIndex);
-            });
-        }
-
-        function pushFeedEvent(stage, message) {
-            const iconMap = { opinions: '💭', review: '🔍', final: '✨', complete: '✅', update: '•' };
-            state.feedEvents.unshift({ stage, message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), icon: iconMap[stage] || '•' });
-            state.feedEvents = state.feedEvents.slice(0, 6);
-            renderAnalysisFeed();
-        }
-
-        function renderAnalysisFeed() {
-            if (!state.feedEvents.length) {
-                analysisFeed.innerHTML = '<div class="feed-empty">Live analysis updates will appear here.</div>';
-                return;
-            }
-            analysisFeed.innerHTML = state.feedEvents.map((event) => `
-                <div class="feed-item">
-                    <span class="feed-icon">${event.icon}</span>
-                    <div class="feed-text">${escapeHtml(event.message)}</div>
-                    <span class="feed-time">${event.time}</span>
-                </div>`).join('');
         }
 
         function getStageText(stage, progress) {
@@ -481,7 +432,6 @@
         });
 
         initializeVisuals();
-        renderAnalysisFeed();
         queryInput.focus();
     </script>
 </body>
