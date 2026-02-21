@@ -966,6 +966,62 @@ body {
     background: rgba(22, 163, 74, 0.18);
 }
 
+.analysis-summary {
+    margin-top: 10px;
+}
+
+.analysis-focus {
+    font-size: 0.94rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.analysis-subtext {
+    margin-top: 4px;
+    font-size: 0.82rem;
+    color: #94a3b8;
+}
+
+.analysis-feed {
+    margin-top: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.feed-empty {
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.feed-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.78rem;
+    padding: 6px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.feed-icon {
+    font-size: 0.9rem;
+}
+
+.feed-text {
+    color: #dbeafe;
+}
+
+.feed-time {
+    color: #93c5fd;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+}
+
 
 /* Better result presentation */
 .result-section {
@@ -1001,4 +1057,5 @@ body {
 @media (max-width: 640px) {
     .analysis-deck { padding: 10px; }
     .stage-track { grid-template-columns: 1fr; }
+    .analysis-feed { max-height: 140px; }
 }
