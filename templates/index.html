@@ -163,13 +163,6 @@
             return councilModels.findIndex(name => normalizeModelName(name) === incoming);
         }
 
-        function setAnalysisCollapsed(collapsed) {
-            analysisDeck.classList.toggle('collapsed', collapsed);
-            analysisToggle.setAttribute('aria-expanded', String(!collapsed));
-            analysisDetails.hidden = collapsed;
-            analysisToggle.textContent = collapsed ? 'Show details' : 'Hide details';
-        }
-
         function upsertOpinion(opinion) {
             if (!opinion) return;
             const opinionIndex = findModelIndex(opinion.model_name);
