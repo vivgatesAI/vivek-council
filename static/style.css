@@ -759,3 +759,118 @@ body {
         gap: var(--space-md);
     }
 }
+
+/* Live visual status */
+.visual-status {
+    margin-top: var(--space-md);
+    display: none;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-sm);
+}
+
+.status-card {
+    background: rgba(26, 26, 36, 0.75);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    transition: all 0.2s ease;
+}
+
+.status-card.active {
+    border-color: rgba(99, 102, 241, 0.8);
+    box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.5), 0 0 20px rgba(99, 102, 241, 0.2);
+}
+
+.status-name {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+
+.status-pill {
+    font-size: 0.75rem;
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+.model-dot.active {
+    color: #f59e0b;
+    transform: scale(1.4);
+}
+
+.model-dot.done {
+    color: var(--success);
+}
+
+.typing-cursor {
+    display: inline-block;
+    margin-left: 4px;
+    animation: cursorBlink 0.8s steps(2, start) infinite;
+}
+
+@keyframes cursorBlink {
+    to { opacity: 0; }
+}
+
+@media (max-width: 640px) {
+    body {
+        overflow: auto;
+    }
+
+    .app {
+        height: 100dvh;
+    }
+
+    .header-badge {
+        display: none;
+    }
+
+    .logo-text {
+        font-size: 1.05rem;
+    }
+
+    .main {
+        padding: var(--space-sm);
+        gap: var(--space-sm);
+    }
+
+    .chat-container {
+        padding-right: 0;
+    }
+
+    .messages {
+        padding: var(--space-xs);
+        gap: var(--space-sm);
+    }
+
+    .input-container {
+        position: sticky;
+        bottom: 0;
+        z-index: 20;
+        margin-top: var(--space-sm);
+        padding: var(--space-sm);
+    }
+
+    .progress-bar {
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+    }
+
+    .model-interaction {
+        width: 100%;
+        margin-right: 0;
+        padding-right: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--border-medium);
+        padding-bottom: var(--space-xs);
+        justify-content: center;
+    }
+
+    .visual-status {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        max-height: 140px;
+    }
+}

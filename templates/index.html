@@ -63,18 +63,9 @@
                     <h2>Welcome to the Council</h2>
                     <p>Ask your question and multiple AI models will collaborate to provide the best answer.</p>
                     <div class="features">
-                        <div class="feature">
-                            <span class="feature-icon">💭</span>
-                            <span>First Opinions</span>
-                        </div>
-                        <div class="feature">
-                            <span class="feature-icon">🔍</span>
-                            <span>Cross Review</span>
-                        </div>
-                        <div class="feature">
-                            <span class="feature-icon">✨</span>
-                            <span>Final Synthesis</span>
-                        </div>
+                        <div class="feature"><span class="feature-icon">💭</span><span>First Opinions</span></div>
+                        <div class="feature"><span class="feature-icon">🔍</span><span>Cross Review</span></div>
+                        <div class="feature"><span class="feature-icon">✨</span><span>Final Synthesis</span></div>
                     </div>
                 </div>
 
@@ -83,64 +74,40 @@
 
             <div class="input-container">
                 <div class="input-wrapper">
-                    <textarea 
-                        id="queryInput" 
-                        placeholder="Ask your question to the council..."
-                        rows="1"
-                        autocomplete="off"
-                    ></textarea>
-                    <button id="sendButton" class="send-button">
+                    <textarea id="queryInput" placeholder="Ask your question to the council..." rows="1" autocomplete="off"></textarea>
+                    <button id="sendButton" class="send-button" aria-label="Send question">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
                         </svg>
                     </button>
                 </div>
                 <div class="progress-bar" id="progressBar" style="display: none;">
-                    <div class="model-interaction" id="modelInteraction">
-                        <div class="model-dot" data-model="0">●</div>
-                        <div class="model-dot" data-model="1">●</div>
-                        <div class="model-dot" data-model="2">●</div>
-                        <div class="model-dot" data-model="3">●</div>
-                        <div class="interaction-line"></div>
-                    </div>
+                    <div class="model-interaction" id="modelInteraction"></div>
                     <div class="progress-fill" id="progressFill"></div>
                     <span class="progress-text" id="progressText">Processing...</span>
                     <span class="timer" id="timer">00:00</span>
                 </div>
+                <div class="visual-status" id="visualStatus"></div>
             </div>
         </main>
 
         <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <h3>Council Tabs</h3>
-            </div>
+            <div class="sidebar-header"><h3>Council Tabs</h3></div>
             <div class="tabs" id="tabs">
-                <button class="tab active" data-tab="final">
-                    <span class="tab-icon">🏆</span>
-                    Final Answer
-                </button>
+                <button class="tab active" data-tab="final"><span class="tab-icon">🏆</span>Final Answer</button>
                 {% for model in model_names %}
-                <button class="tab" data-tab="{{ loop.index0 }}">
-                    <span class="tab-icon">🤖</span>
-                    {{ model }}
-                </button>
+                <button class="tab" data-tab="{{ loop.index0 }}"><span class="tab-icon">🤖</span>{{ model }}</button>
                 {% endfor %}
-                <button class="tab" data-tab="reviews">
-                    <span class="tab-icon">📋</span>
-                    Reviews
-                </button>
+                <button class="tab" data-tab="reviews"><span class="tab-icon">📋</span>Reviews</button>
             </div>
         </aside>
     </div>
 
     <script>
+        const councilModels = {{ model_names|tojson }};
         const state = {
-            messages: [],
-            opinions: [],
-            reviews: [],
-            finalResponse: '',
-            currentTab: 'final',
-            isProcessing: false
+            messages: [], opinions: [], reviews: [], finalResponse: '', currentTab: 'final',
+            isProcessing: false, activeModel: '', stage: 'idle', streamBuffer: ''
         };
 
         const queryInput = document.getElementById('queryInput');
@@ -151,42 +118,48 @@
         const progressText = document.getElementById('progressText');
         const welcomeMessage = document.getElementById('welcomeMessage');
         const tabsContainer = document.getElementById('tabs');
+        const visualStatus = document.getElementById('visualStatus');
+        const modelInteraction = document.getElementById('modelInteraction');
 
-        // Auto-resize textarea
+        function initializeVisuals() {
+            modelInteraction.innerHTML = councilModels.map((name, idx) => `<div class="model-dot" data-model="${idx}" title="${name}">●</div>`).join('') + '<div class="interaction-line"></div>';
+            visualStatus.innerHTML = councilModels.map((name, idx) => `
+                <div class="status-card" id="status-${idx}">
+                    <div class="status-name">${name}</div>
+                    <div class="status-pill">Waiting</div>
+                </div>`).join('');
+        }
+
         queryInput.addEventListener('input', () => {
             queryInput.style.height = 'auto';
             queryInput.style.height = Math.min(queryInput.scrollHeight, 150) + 'px';
         });
-
-        // Handle Enter key
         queryInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendQuery();
-            }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
         });
-
         sendButton.addEventListener('click', sendQuery);
 
-        // Timer functionality
         let timerInterval = null;
-        let startTime = null;
-        
         function startTimer() {
-            startTime = Date.now();
+            const startTime = Date.now();
             timerInterval = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
-                const secs = String(elapsed % 60).padStart(2, '0');
-                document.getElementById('timer').textContent = `${mins}:${secs}`;
+                document.getElementById('timer').textContent = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
             }, 1000);
         }
-        
-        function stopTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
+        function stopTimer() { if (timerInterval) clearInterval(timerInterval); timerInterval = null; }
+
+        function setModelStatus(modelName, text, isActive = false) {
+            const idx = councilModels.findIndex(name => name === modelName);
+            if (idx === -1) return;
+            const card = document.getElementById(`status-${idx}`);
+            if (!card) return;
+            card.querySelector('.status-pill').textContent = text;
+            card.classList.toggle('active', isActive);
+            document.querySelectorAll('.model-dot').forEach((dot, dotIdx) => {
+                dot.classList.toggle('active', dotIdx === idx && isActive);
+                if (text === 'Done' && dotIdx === idx) dot.classList.add('done');
+            });
         }
 
         async function sendQuery() {
@@ -200,15 +173,13 @@
             queryInput.value = '';
             queryInput.disabled = true;
             sendButton.disabled = true;
-
-            // Hide welcome, show progress
             welcomeMessage.style.display = 'none';
             progressBar.style.display = 'flex';
+            visualStatus.style.display = 'grid';
+            initializeVisuals();
             startTimer();
 
-            // Add user message
             addMessage('user', message);
-            state.messages.push({ role: 'user', content: message });
 
             try {
                 const response = await fetch('/api/council/stream', {
@@ -217,64 +188,33 @@
                     body: JSON.stringify({ message })
                 });
 
+                if (!response.ok || !response.body) {
+                    throw new Error(`Request failed (${response.status})`);
+                }
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let buffer = '';
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const events = buffer.split('\n\n');
+                    buffer = events.pop() || '';
 
-                    const text = decoder.decode(value);
-                    const lines = text.split('data: ').filter(line => line.trim());
-
-                    for (const line of lines) {
+                    for (const event of events) {
+                        if (!event.startsWith('data: ')) continue;
+                        const payload = event.slice(6).trim();
+                        if (!payload) continue;
                         try {
-                            const data = JSON.parse(line);
-                            
-                            if (data.error) {
-                                addMessage('error', data.error);
-                                continue;
-                            }
-
-                            // Update progress
-                            if (data.progress !== undefined) {
-                                progressFill.style.width = data.progress + '%';
-                                // Use message from backend if available, otherwise fallback to default text
-                                if (data.message) {
-                                    progressText.textContent = data.message;
-                                } else {
-                                    progressText.textContent = getStageText(data.stage, data.progress);
-                                }
-                            }
-
-                            // Store opinion index for tracking
-                            if (data.opinion_index !== undefined) {
-                                // Track that we got an opinion
-                            }
-                            
-                            // Store full opinion when received
-                            if (data.opinion) {
-                                state.opinions.push(data.opinion);
-                            }
-
-                            // Store review
-                            if (data.review) {
-                                state.reviews.push(data.review);
-                            }
-
-                            // Final response
-                            if (data.final) {
-                                state.finalResponse = data.final;
-                                addFinalCard(data.final);
-                                // Also display all results after final response
-                                displayResults();
-                            }
+                            const data = JSON.parse(payload);
+                            handleStreamEvent(data);
                         } catch (e) {
-                            console.error('Parse error:', e);
+                            console.error('SSE parse error', e, payload);
                         }
                     }
                 }
-
             } catch (error) {
                 addMessage('error', 'Failed to connect to council: ' + error.message);
             } finally {
@@ -282,7 +222,6 @@
                 queryInput.disabled = false;
                 sendButton.disabled = false;
                 stopTimer();
-                // Show completion state for a moment before hiding
                 progressText.textContent = 'Complete!';
                 setTimeout(() => {
                     progressBar.style.display = 'none';
@@ -293,6 +232,51 @@
             }
         }
 
+        function handleStreamEvent(data) {
+            if (data.error) {
+                addMessage('error', data.error || data.message || 'Unknown stream error');
+                return;
+            }
+
+            if (data.progress !== undefined) {
+                progressFill.style.width = data.progress + '%';
+                progressText.textContent = data.message || getStageText(data.stage, data.progress);
+            }
+
+            if (data.current_model && data.message) {
+                const active = !data.message.toLowerCase().includes('completed') && !data.message.toLowerCase().includes('submitted') && !data.message.toLowerCase().includes('synthesized');
+                setModelStatus(data.current_model, active ? 'Working' : 'Done', active);
+            }
+
+            if (data.opinion) state.opinions.push(data.opinion);
+            if (data.review) state.reviews.push(data.review);
+
+            if (data.final_chunk) {
+                state.finalResponse += data.final_chunk;
+                renderStreamingFinal();
+            }
+
+            if (data.final) {
+                state.finalResponse = data.final;
+                displayResults();
+            }
+        }
+
+        function renderStreamingFinal() {
+            let finalCard = document.getElementById('streamingFinalCard');
+            if (!finalCard) {
+                finalCard = document.createElement('div');
+                finalCard.className = 'result-section final-result streaming';
+                finalCard.id = 'streamingFinalCard';
+                messagesContainer.innerHTML = '';
+                messagesContainer.appendChild(finalCard);
+            }
+            finalCard.innerHTML = `
+                <div class="result-header"><span class="result-badge">🏆</span><span>Chairman is writing...</span></div>
+                <div class="result-content">${formatContent(state.finalResponse)}<span class="typing-cursor">▌</span></div>
+            `;
+        }
+
         function getStageText(stage, progress) {
             if (progress < 30) return 'Getting first opinions...';
             if (progress < 60) return 'Cross-reviewing responses...';
@@ -300,51 +284,17 @@
             return 'Complete!';
         }
 
-        function addOpinionCard(opinion) {
-            welcomeMessage.style.display = 'none';
-            const div = document.createElement('div');
-            div.className = 'result-section opinion-result';
-            div.innerHTML = `
-                <div class="result-header">
-                    <span class="result-badge">🤖</span>
-                    <span>${opinion.model_name}</span>
-                </div>
-                <div class="result-content">${formatContent(opinion.content)}</div>
-            `;
-            messagesContainer.appendChild(div);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function addFinalCard(content) {
-            const div = document.createElement('div');
-            div.className = 'result-section final-result';
-            div.innerHTML = `
-                <div class="result-header">
-                    <span class="result-badge">🏆</span>
-                    <span>Final Council Answer</span>
-                </div>
-                <div class="result-content">${formatContent(content)}</div>
-            `;
-            messagesContainer.appendChild(div);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
         function addMessage(role, content) {
             const div = document.createElement('div');
             div.className = `message message-${role}`;
-            div.innerHTML = `
-                <div class="message-avatar">${role === 'user' ? '👤' : '🏛️'}</div>
-                <div class="message-content">
-                    <div class="message-text">${formatContent(content)}</div>
-                </div>
-            `;
+            div.innerHTML = `<div class="message-avatar">${role === 'user' ? '👤' : '🏛️'}</div><div class="message-content"><div class="message-text">${formatContent(content)}</div></div>`;
             messagesContainer.appendChild(div);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
         function formatContent(content) {
-            // Simple markdown-like formatting
-            return content
+            return String(content || '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
@@ -352,83 +302,45 @@
         }
 
         function displayResults() {
-            // Clear messages and show structured view
             messagesContainer.innerHTML = '';
-
-            // Add final response prominently
             if (state.finalResponse) {
                 const finalDiv = document.createElement('div');
                 finalDiv.className = 'result-section final-result';
                 finalDiv.dataset.tab = 'final';
                 finalDiv.style.display = state.currentTab === 'final' ? 'block' : 'none';
-                finalDiv.innerHTML = `
-                    <div class="result-header">
-                        <span class="result-badge">🏆</span>
-                        <span>Final Council Answer</span>
-                    </div>
-                    <div class="result-content">${formatContent(state.finalResponse)}</div>
-                `;
+                finalDiv.innerHTML = `<div class="result-header"><span class="result-badge">🏆</span><span>Final Council Answer</span></div><div class="result-content">${formatContent(state.finalResponse)}</div>`;
                 messagesContainer.appendChild(finalDiv);
             }
 
-            // Add opinions
             state.opinions.forEach((opinion, i) => {
                 const div = document.createElement('div');
                 div.className = 'result-section opinion-result';
                 div.dataset.tab = i;
                 div.style.display = state.currentTab == i ? 'block' : 'none';
-                div.innerHTML = `
-                    <div class="result-header">
-                        <span class="result-badge">🤖</span>
-                        <span>${opinion.model_name}</span>
-                    </div>
-                    <div class="result-content">${formatContent(opinion.content)}</div>
-                `;
+                div.innerHTML = `<div class="result-header"><span class="result-badge">🤖</span><span>${opinion.model_name}</span></div><div class="result-content">${formatContent(opinion.content)}</div>`;
                 messagesContainer.appendChild(div);
             });
 
-            // Add reviews
             if (state.reviews.length > 0) {
                 const reviewsDiv = document.createElement('div');
                 reviewsDiv.className = 'result-section reviews-result';
                 reviewsDiv.dataset.tab = 'reviews';
                 reviewsDiv.style.display = state.currentTab === 'reviews' ? 'block' : 'none';
-                
-                let reviewsHTML = '<div class="reviews-grid">';
-                state.reviews.forEach(review => {
-                    reviewsHTML += `
-                        <div class="review-card">
-                            <div class="review-header">${review.model_name}</div>
-                            <div class="review-content">${formatContent(review.content)}</div>
-                        </div>
-                    `;
-                });
-                reviewsHTML += '</div>';
-                
-                reviewsDiv.innerHTML = `
-                    <div class="result-header">
-                        <span class="result-badge">📋</span>
-                        <span>Cross Reviews</span>
-                    </div>
-                    ${reviewsHTML}
-                `;
+                reviewsDiv.innerHTML = `<div class="result-header"><span class="result-badge">📋</span><span>Cross Reviews</span></div><div class="reviews-grid">${state.reviews.map(review => `<div class="review-card"><div class="review-header">${review.model_name}</div><div class="review-content">${formatContent(review.content)}</div></div>`).join('')}</div>`;
                 messagesContainer.appendChild(reviewsDiv);
             }
         }
 
-        // Tab switching
         tabsContainer.addEventListener('click', (e) => {
             const tab = e.target.closest('.tab');
             if (!tab) return;
-
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-            
             state.currentTab = tab.dataset.tab;
             displayResults();
         });
 
-        // Initialize
+        initializeVisuals();
         queryInput.focus();
     </script>
 </body>
