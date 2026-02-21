@@ -38,10 +38,10 @@ class Config:
     # Council Models - Updated Feb 2026 with confirmed working models
     # Note: kimi-k2-5 is Private Beta and may be unavailable - using stable alternatives
     COUNCIL_MODELS: List[str] = [
-        "minimax-m25",       # MiniMax M2.5 - Your default (reliable)
-        "claude-sonnet-45",  # Claude Sonnet 4.5 - Balanced
-        "deepseek-v3.2",     # DeepSeek V3.2 - Efficient
-        "grok-41-fast",      # Grok 4.1 Fast - Quick responses
+        "minimax-m25",              # MiniMax M2.5 - Your default (reliable)
+        "claude-sonnet-45",         # Claude Sonnet 4.5 - Balanced
+        "google-gemini-flash-preview",  # Google Gemini Flash Preview
+        "grok-41-fast",             # Grok 4.1 Fast - Quick responses
     ]
     
     # Chairman Model - Produces final response
@@ -372,6 +372,7 @@ FINAL RESPONSE:"""
             "openai-gpt-52": "GPT-5.2",
             "llama-3.3-70b": "Llama 3.3 70B",
             "minimax-m25": "MiniMax M2.5",
+            "google-gemini-flash-preview": "Gemini Flash Preview",
         }
         return names.get(model_id, model_id.replace("-", " ").title())
     
