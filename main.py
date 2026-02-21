@@ -40,7 +40,7 @@ class Config:
     COUNCIL_MODELS: List[str] = [
         "minimax-m25",              # MiniMax M2.5 - Your default (reliable)
         "claude-sonnet-45",         # Claude Sonnet 4.5 - Balanced
-        "google-gemini-flash-preview",  # Google Gemini Flash Preview
+        "gemini-3-flash-preview",   # Google Gemini 3 Flash Preview
         "grok-41-fast",             # Grok 4.1 Fast - Quick responses
     ]
     
@@ -372,7 +372,7 @@ FINAL RESPONSE:"""
             "openai-gpt-52": "GPT-5.2",
             "llama-3.3-70b": "Llama 3.3 70B",
             "minimax-m25": "MiniMax M2.5",
-            "google-gemini-flash-preview": "Gemini Flash Preview",
+            "gemini-3-flash-preview": "Gemini 3 Flash Preview",
         }
         return names.get(model_id, model_id.replace("-", " ").title())
     
