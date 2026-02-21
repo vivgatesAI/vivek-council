@@ -57,24 +57,28 @@
                 </div>
             </div>
 
+            <section class="analysis-deck" id="analysisDeck">
+                <div class="stage-track" id="stageTrack">
+                    <div class="stage-pill active" data-stage="opinions">1 · Opinions</div>
+                    <div class="stage-pill" data-stage="review">2 · Cross-review</div>
+                    <div class="stage-pill" data-stage="final">3 · Final synthesis</div>
+                </div>
+                <div class="analysis-meta">
+                    <div class="analysis-focus" id="analysisFocus">Ready for your question.</div>
+                    <div class="analysis-subtext" id="analysisSubtext">The council will reason step-by-step and show live progress.</div>
+                </div>
+                <div class="analysis-feed" id="analysisFeed"></div>
+            </section>
+
             <div class="chat-container" id="chatContainer">
                 <div class="welcome-message" id="welcomeMessage">
                     <div class="welcome-icon">🏛️</div>
                     <h2>Welcome to the Council</h2>
                     <p>Ask your question and multiple AI models will collaborate to provide the best answer.</p>
                     <div class="features">
-                        <div class="feature">
-                            <span class="feature-icon">💭</span>
-                            <span>First Opinions</span>
-                        </div>
-                        <div class="feature">
-                            <span class="feature-icon">🔍</span>
-                            <span>Cross Review</span>
-                        </div>
-                        <div class="feature">
-                            <span class="feature-icon">✨</span>
-                            <span>Final Synthesis</span>
-                        </div>
+                        <div class="feature"><span class="feature-icon">💭</span><span>First Opinions</span></div>
+                        <div class="feature"><span class="feature-icon">🔍</span><span>Cross Review</span></div>
+                        <div class="feature"><span class="feature-icon">✨</span><span>Final Synthesis</span></div>
                     </div>
                 </div>
 
@@ -83,64 +87,43 @@
 
             <div class="input-container">
                 <div class="input-wrapper">
-                    <textarea 
-                        id="queryInput" 
-                        placeholder="Ask your question to the council..."
-                        rows="1"
-                        autocomplete="off"
-                    ></textarea>
-                    <button id="sendButton" class="send-button">
+                    <textarea id="queryInput" placeholder="Ask your question to the council..." rows="1" autocomplete="off"></textarea>
+                    <button id="sendButton" class="send-button" aria-label="Send question">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
                         </svg>
                     </button>
                 </div>
                 <div class="progress-bar" id="progressBar" style="display: none;">
-                    <div class="model-interaction" id="modelInteraction">
-                        <div class="model-dot" data-model="0">●</div>
-                        <div class="model-dot" data-model="1">●</div>
-                        <div class="model-dot" data-model="2">●</div>
-                        <div class="model-dot" data-model="3">●</div>
-                        <div class="interaction-line"></div>
-                    </div>
+                    <div class="model-interaction" id="modelInteraction"></div>
                     <div class="progress-fill" id="progressFill"></div>
                     <span class="progress-text" id="progressText">Processing...</span>
                     <span class="timer" id="timer">00:00</span>
+                </div>
+                <div class="visual-status" id="visualStatus"></div>
+                <div class="export-row">
+                    <button id="downloadButton" class="download-button" disabled>Download Executive Brief (.html)</button>
                 </div>
             </div>
         </main>
 
         <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <h3>Council Tabs</h3>
-            </div>
+            <div class="sidebar-header"><h3>Council Tabs</h3></div>
             <div class="tabs" id="tabs">
-                <button class="tab active" data-tab="final">
-                    <span class="tab-icon">🏆</span>
-                    Final Answer
-                </button>
+                <button class="tab active" data-tab="final"><span class="tab-icon">🏆</span>Final Answer</button>
                 {% for model in model_names %}
-                <button class="tab" data-tab="{{ loop.index0 }}">
-                    <span class="tab-icon">🤖</span>
-                    {{ model }}
-                </button>
+                <button class="tab" data-tab="{{ loop.index0 }}"><span class="tab-icon">🤖</span>{{ model }}</button>
                 {% endfor %}
-                <button class="tab" data-tab="reviews">
-                    <span class="tab-icon">📋</span>
-                    Reviews
-                </button>
+                <button class="tab" data-tab="reviews"><span class="tab-icon">📋</span>Reviews</button>
             </div>
         </aside>
     </div>
 
     <script>
+        const councilModels = {{ model_names|tojson }};
         const state = {
-            messages: [],
-            opinions: [],
-            reviews: [],
-            finalResponse: '',
-            currentTab: 'final',
-            isProcessing: false
+            messages: [], opinions: [], reviews: [], finalResponse: '', currentTab: 'final',
+            isProcessing: false, activeModel: '', stage: 'idle', streamBuffer: '', currentQuestion: '', feedEvents: []
         };
 
         const queryInput = document.getElementById('queryInput');
@@ -151,42 +134,54 @@
         const progressText = document.getElementById('progressText');
         const welcomeMessage = document.getElementById('welcomeMessage');
         const tabsContainer = document.getElementById('tabs');
+        const visualStatus = document.getElementById('visualStatus');
+        const modelInteraction = document.getElementById('modelInteraction');
+        const downloadButton = document.getElementById('downloadButton');
+        const stageTrack = document.getElementById('stageTrack');
+        const analysisFocus = document.getElementById('analysisFocus');
+        const analysisSubtext = document.getElementById('analysisSubtext');
+        const analysisFeed = document.getElementById('analysisFeed');
 
-        // Auto-resize textarea
+        function initializeVisuals() {
+            modelInteraction.innerHTML = councilModels.map((name, idx) => `<div class="model-dot" data-model="${idx}" title="${name}">●</div>`).join('') + '<div class="interaction-line"></div>';
+            visualStatus.innerHTML = councilModels.map((name, idx) => `
+                <div class="status-card" id="status-${idx}">
+                    <div class="status-name">${name}</div>
+                    <div class="status-pill">Waiting</div>
+                </div>`).join('');
+        }
+
         queryInput.addEventListener('input', () => {
             queryInput.style.height = 'auto';
             queryInput.style.height = Math.min(queryInput.scrollHeight, 150) + 'px';
         });
-
-        // Handle Enter key
         queryInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendQuery();
-            }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
         });
-
         sendButton.addEventListener('click', sendQuery);
+        downloadButton.addEventListener('click', downloadReport);
 
-        // Timer functionality
         let timerInterval = null;
-        let startTime = null;
-        
         function startTimer() {
-            startTime = Date.now();
+            const startTime = Date.now();
             timerInterval = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
-                const secs = String(elapsed % 60).padStart(2, '0');
-                document.getElementById('timer').textContent = `${mins}:${secs}`;
+                document.getElementById('timer').textContent = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
             }, 1000);
         }
-        
-        function stopTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
+        function stopTimer() { if (timerInterval) clearInterval(timerInterval); timerInterval = null; }
+
+        function setModelStatus(modelName, text, isActive = false) {
+            const idx = councilModels.findIndex(name => name === modelName);
+            if (idx === -1) return;
+            const card = document.getElementById(`status-${idx}`);
+            if (!card) return;
+            card.querySelector('.status-pill').textContent = text;
+            card.classList.toggle('active', isActive);
+            document.querySelectorAll('.model-dot').forEach((dot, dotIdx) => {
+                dot.classList.toggle('active', dotIdx === idx && isActive);
+                if (text === 'Done' && dotIdx === idx) dot.classList.add('done');
+            });
         }
 
         async function sendQuery() {
@@ -197,18 +192,23 @@
             state.opinions = [];
             state.reviews = [];
             state.finalResponse = '';
+            state.currentQuestion = message;
             queryInput.value = '';
+            downloadButton.disabled = true;
             queryInput.disabled = true;
             sendButton.disabled = true;
-
-            // Hide welcome, show progress
             welcomeMessage.style.display = 'none';
             progressBar.style.display = 'flex';
+            visualStatus.style.display = 'grid';
+            initializeVisuals();
+            setStageState('opinions');
+            state.feedEvents = [];
+            renderAnalysisFeed();
+            analysisFocus.textContent = 'Council initialized';
+            analysisSubtext.textContent = 'Gathering first perspectives from each model.';
             startTimer();
 
-            // Add user message
             addMessage('user', message);
-            state.messages.push({ role: 'user', content: message });
 
             try {
                 const response = await fetch('/api/council/stream', {
@@ -217,64 +217,33 @@
                     body: JSON.stringify({ message })
                 });
 
+                if (!response.ok || !response.body) {
+                    throw new Error(`Request failed (${response.status})`);
+                }
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let buffer = '';
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const events = buffer.split('\n\n');
+                    buffer = events.pop() || '';
 
-                    const text = decoder.decode(value);
-                    const lines = text.split('data: ').filter(line => line.trim());
-
-                    for (const line of lines) {
+                    for (const event of events) {
+                        if (!event.startsWith('data: ')) continue;
+                        const payload = event.slice(6).trim();
+                        if (!payload) continue;
                         try {
-                            const data = JSON.parse(line);
-                            
-                            if (data.error) {
-                                addMessage('error', data.error);
-                                continue;
-                            }
-
-                            // Update progress
-                            if (data.progress !== undefined) {
-                                progressFill.style.width = data.progress + '%';
-                                // Use message from backend if available, otherwise fallback to default text
-                                if (data.message) {
-                                    progressText.textContent = data.message;
-                                } else {
-                                    progressText.textContent = getStageText(data.stage, data.progress);
-                                }
-                            }
-
-                            // Store opinion index for tracking
-                            if (data.opinion_index !== undefined) {
-                                // Track that we got an opinion
-                            }
-                            
-                            // Store full opinion when received
-                            if (data.opinion) {
-                                state.opinions.push(data.opinion);
-                            }
-
-                            // Store review
-                            if (data.review) {
-                                state.reviews.push(data.review);
-                            }
-
-                            // Final response
-                            if (data.final) {
-                                state.finalResponse = data.final;
-                                addFinalCard(data.final);
-                                // Also display all results after final response
-                                displayResults();
-                            }
+                            const data = JSON.parse(payload);
+                            handleStreamEvent(data);
                         } catch (e) {
-                            console.error('Parse error:', e);
+                            console.error('SSE parse error', e, payload);
                         }
                     }
                 }
-
             } catch (error) {
                 addMessage('error', 'Failed to connect to council: ' + error.message);
             } finally {
@@ -282,7 +251,6 @@
                 queryInput.disabled = false;
                 sendButton.disabled = false;
                 stopTimer();
-                // Show completion state for a moment before hiding
                 progressText.textContent = 'Complete!';
                 setTimeout(() => {
                     progressBar.style.display = 'none';
@@ -293,6 +261,92 @@
             }
         }
 
+        function handleStreamEvent(data) {
+            if (data.error) {
+                addMessage('error', data.error || data.message || 'Unknown stream error');
+                return;
+            }
+
+            if (data.progress !== undefined) {
+                progressFill.style.width = data.progress + '%';
+                progressText.textContent = data.message || getStageText(data.stage, data.progress);
+                if (data.stage) setStageState(data.stage);
+            }
+
+            if (data.current_model && data.message) {
+                const active = !data.message.toLowerCase().includes('completed') && !data.message.toLowerCase().includes('submitted') && !data.message.toLowerCase().includes('synthesized');
+                setModelStatus(data.current_model, active ? 'Working' : 'Done', active);
+                analysisFocus.textContent = data.current_model;
+                analysisSubtext.textContent = data.message;
+                pushFeedEvent(data.stage || 'update', `${data.current_model}: ${data.message}`);
+            }
+
+            if (data.opinion) state.opinions.push(data.opinion);
+            if (data.review) state.reviews.push(data.review);
+
+            if (data.final_chunk) {
+                state.finalResponse += data.final_chunk;
+                renderStreamingFinal();
+            }
+
+            if (data.final) {
+                state.finalResponse = data.final;
+                displayResults();
+                downloadButton.disabled = false;
+                analysisFocus.textContent = 'Council complete';
+                analysisSubtext.textContent = 'Final recommendation ready. You can review tabs or download the executive brief.';
+                pushFeedEvent('complete', 'Final recommendation delivered successfully.');
+            }
+        }
+
+        function renderStreamingFinal() {
+            let finalCard = document.getElementById('streamingFinalCard');
+            if (!finalCard) {
+                finalCard = document.createElement('div');
+                finalCard.className = 'result-section final-result streaming';
+                finalCard.id = 'streamingFinalCard';
+                messagesContainer.innerHTML = '';
+                messagesContainer.appendChild(finalCard);
+            }
+            finalCard.innerHTML = `
+                <div class="result-header"><span class="result-badge">🏆</span><span>Chairman is writing...</span></div>
+                <div class="result-content">${formatContent(state.finalResponse)}<span class="typing-cursor">▌</span></div>
+            `;
+        }
+
+
+        function setStageState(stage) {
+            const normalized = stage === 'complete' ? 'final' : stage;
+            stageTrack.querySelectorAll('.stage-pill').forEach((pill) => {
+                const pillStage = pill.dataset.stage;
+                const order = ['opinions', 'review', 'final'];
+                const activeIndex = order.indexOf(normalized);
+                const pillIndex = order.indexOf(pillStage);
+                pill.classList.toggle('active', pillStage === normalized);
+                pill.classList.toggle('done', pillIndex < activeIndex);
+            });
+        }
+
+        function pushFeedEvent(stage, message) {
+            const iconMap = { opinions: '💭', review: '🔍', final: '✨', complete: '✅', update: '•' };
+            state.feedEvents.unshift({ stage, message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), icon: iconMap[stage] || '•' });
+            state.feedEvents = state.feedEvents.slice(0, 6);
+            renderAnalysisFeed();
+        }
+
+        function renderAnalysisFeed() {
+            if (!state.feedEvents.length) {
+                analysisFeed.innerHTML = '<div class="feed-empty">Live analysis updates will appear here.</div>';
+                return;
+            }
+            analysisFeed.innerHTML = state.feedEvents.map((event) => `
+                <div class="feed-item">
+                    <span class="feed-icon">${event.icon}</span>
+                    <div class="feed-text">${escapeHtml(event.message)}</div>
+                    <span class="feed-time">${event.time}</span>
+                </div>`).join('');
+        }
+
         function getStageText(stage, progress) {
             if (progress < 30) return 'Getting first opinions...';
             if (progress < 60) return 'Cross-reviewing responses...';
@@ -300,51 +354,17 @@
             return 'Complete!';
         }
 
-        function addOpinionCard(opinion) {
-            welcomeMessage.style.display = 'none';
-            const div = document.createElement('div');
-            div.className = 'result-section opinion-result';
-            div.innerHTML = `
-                <div class="result-header">
-                    <span class="result-badge">🤖</span>
-                    <span>${opinion.model_name}</span>
-                </div>
-                <div class="result-content">${formatContent(opinion.content)}</div>
-            `;
-            messagesContainer.appendChild(div);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function addFinalCard(content) {
-            const div = document.createElement('div');
-            div.className = 'result-section final-result';
-            div.innerHTML = `
-                <div class="result-header">
-                    <span class="result-badge">🏆</span>
-                    <span>Final Council Answer</span>
-                </div>
-                <div class="result-content">${formatContent(content)}</div>
-            `;
-            messagesContainer.appendChild(div);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
         function addMessage(role, content) {
             const div = document.createElement('div');
             div.className = `message message-${role}`;
-            div.innerHTML = `
-                <div class="message-avatar">${role === 'user' ? '👤' : '🏛️'}</div>
-                <div class="message-content">
-                    <div class="message-text">${formatContent(content)}</div>
-                </div>
-            `;
+            div.innerHTML = `<div class="message-avatar">${role === 'user' ? '👤' : '🏛️'}</div><div class="message-content"><div class="message-text">${formatContent(content)}</div></div>`;
             messagesContainer.appendChild(div);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
         function formatContent(content) {
-            // Simple markdown-like formatting
-            return content
+            return String(content || '')
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
@@ -352,83 +372,116 @@
         }
 
         function displayResults() {
-            // Clear messages and show structured view
             messagesContainer.innerHTML = '';
-
-            // Add final response prominently
             if (state.finalResponse) {
                 const finalDiv = document.createElement('div');
                 finalDiv.className = 'result-section final-result';
                 finalDiv.dataset.tab = 'final';
                 finalDiv.style.display = state.currentTab === 'final' ? 'block' : 'none';
-                finalDiv.innerHTML = `
-                    <div class="result-header">
-                        <span class="result-badge">🏆</span>
-                        <span>Final Council Answer</span>
-                    </div>
-                    <div class="result-content">${formatContent(state.finalResponse)}</div>
-                `;
+                finalDiv.innerHTML = `<div class="result-header"><span class="result-badge">🏆</span><span>Final Council Answer</span></div><div class="result-content">${formatContent(state.finalResponse)}</div>`;
                 messagesContainer.appendChild(finalDiv);
             }
 
-            // Add opinions
             state.opinions.forEach((opinion, i) => {
                 const div = document.createElement('div');
                 div.className = 'result-section opinion-result';
                 div.dataset.tab = i;
                 div.style.display = state.currentTab == i ? 'block' : 'none';
-                div.innerHTML = `
-                    <div class="result-header">
-                        <span class="result-badge">🤖</span>
-                        <span>${opinion.model_name}</span>
-                    </div>
-                    <div class="result-content">${formatContent(opinion.content)}</div>
-                `;
+                div.innerHTML = `<div class="result-header"><span class="result-badge">🤖</span><span>${opinion.model_name}</span></div><div class="result-content">${formatContent(opinion.content)}</div>`;
                 messagesContainer.appendChild(div);
             });
 
-            // Add reviews
             if (state.reviews.length > 0) {
                 const reviewsDiv = document.createElement('div');
                 reviewsDiv.className = 'result-section reviews-result';
                 reviewsDiv.dataset.tab = 'reviews';
                 reviewsDiv.style.display = state.currentTab === 'reviews' ? 'block' : 'none';
-                
-                let reviewsHTML = '<div class="reviews-grid">';
-                state.reviews.forEach(review => {
-                    reviewsHTML += `
-                        <div class="review-card">
-                            <div class="review-header">${review.model_name}</div>
-                            <div class="review-content">${formatContent(review.content)}</div>
-                        </div>
-                    `;
-                });
-                reviewsHTML += '</div>';
-                
-                reviewsDiv.innerHTML = `
-                    <div class="result-header">
-                        <span class="result-badge">📋</span>
-                        <span>Cross Reviews</span>
-                    </div>
-                    ${reviewsHTML}
-                `;
+                reviewsDiv.innerHTML = `<div class="result-header"><span class="result-badge">📋</span><span>Cross Reviews</span></div><div class="reviews-grid">${state.reviews.map(review => `<div class="review-card"><div class="review-header">${review.model_name}</div><div class="review-content">${formatContent(review.content)}</div></div>`).join('')}</div>`;
                 messagesContainer.appendChild(reviewsDiv);
             }
         }
 
-        // Tab switching
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function reportSection(title, content, meta = '') {
+            return `<section class="brief-card"><h3>${escapeHtml(title)}</h3>${meta ? `<p class="brief-meta">${escapeHtml(meta)}</p>` : ''}<div class="brief-content">${escapeHtml(content).replace(/\n/g, '<br>')}</div></section>`;
+        }
+
+        function buildExecutiveBriefHtml() {
+            const now = new Date();
+            const finalSection = reportSection('Final Recommendation', state.finalResponse || 'No final response captured yet.', 'Chairman synthesis');
+            const opinions = state.opinions.map((op, idx) => reportSection(`Council Member ${idx + 1}: ${op.model_name}`, op.content)).join('');
+            const reviews = state.reviews.map((rev, idx) => reportSection(`Review ${idx + 1}: ${rev.model_name}`, rev.content)).join('');
+
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vivek Council Executive Brief</title>
+<style>
+:root { --ink:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --accent:#1d4ed8; --accent2:#7c3aed; }
+*{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(170deg,#eef2ff 0%,#f8fafc 40%,#ecfeff 100%);color:var(--ink);}
+.wrap{max-width:980px;margin:0 auto;padding:40px 24px 80px;}
+.hero{background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;padding:32px;border-radius:18px;box-shadow:0 20px 45px rgba(30,64,175,.25);margin-bottom:24px;}
+.hero h1{margin:0 0 10px;font-size:30px} .hero p{margin:6px 0 0;opacity:.95}
+.grid{display:grid;gap:18px}
+.brief-card{background:var(--card);border:1px solid #dbeafe;border-radius:16px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+.brief-card h3{margin:0 0 8px;color:#1e3a8a;font-size:18px}.brief-meta{margin:0 0 12px;color:var(--muted);font-size:13px}.brief-content{line-height:1.7;color:#0f172a;font-size:15px;white-space:normal}
+.section-title{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#334155;margin:28px 0 8px;font-weight:700}
+.footer{margin-top:28px;color:#64748b;font-size:12px;text-align:right}
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="hero">
+        <h1>Vivek Council — Executive Brief</h1>
+        <p><strong>Prompt:</strong> ${escapeHtml(state.currentQuestion || 'N/A')}</p>
+        <p>Generated: ${escapeHtml(now.toLocaleString())}</p>
+    </div>
+    <div class="grid">${finalSection}</div>
+    <div class="section-title">Council Member Perspectives</div>
+    <div class="grid">${opinions || '<section class="brief-card"><div class="brief-content">No member opinions captured.</div></section>'}</div>
+    <div class="section-title">Cross-Reviews</div>
+    <div class="grid">${reviews || '<section class="brief-card"><div class="brief-content">No review content captured.</div></section>'}</div>
+    <div class="footer">Prepared by Vivek Council</div>
+</div>
+</body>
+</html>`;
+        }
+
+        function downloadReport() {
+            const html = buildExecutiveBriefHtml();
+            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const ts = new Date().toISOString().replace(/[:.]/g, '-');
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vivek-council-executive-brief-${ts}.html`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
         tabsContainer.addEventListener('click', (e) => {
             const tab = e.target.closest('.tab');
             if (!tab) return;
-
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-            
             state.currentTab = tab.dataset.tab;
             displayResults();
         });
 
-        // Initialize
+        initializeVisuals();
+        renderAnalysisFeed();
         queryInput.focus();
     </script>
 </body>
