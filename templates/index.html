@@ -155,6 +155,16 @@
             return councilModels.findIndex(name => normalizeModelName(name) === incoming);
         }
 
+        function upsertOpinion(opinion) {
+            if (!opinion) return;
+            const opinionIndex = findModelIndex(opinion.model_name);
+            if (opinionIndex === -1) {
+                state.opinions.push(opinion);
+                return;
+            }
+            state.opinions[opinionIndex] = opinion;
+        }
+
         function resetAnalysisState() {
             analysisFocus.textContent = 'Ready for your question.';
             analysisSubtext.textContent = 'The council will reason step-by-step and show live progress.';
@@ -272,7 +282,7 @@
             if (!message || state.isProcessing) return;
 
             state.isProcessing = true;
-            state.opinions = [];
+            state.opinions = Array(councilModels.length).fill(null);
             state.reviews = [];
             state.finalResponse = '';
             state.currentQuestion = message;
@@ -364,7 +374,10 @@
                 setActiveChip(data.current_model, active);
             }
 
-            if (data.opinion) state.opinions.push(data.opinion);
+            if (data.opinion) {
+                upsertOpinion(data.opinion);
+                displayResults();
+            }
             if (data.review) state.reviews.push(data.review);
 
             if (data.final_chunk) {
@@ -429,12 +442,17 @@
                 messagesContainer.appendChild(finalDiv);
             }
 
-            state.opinions.forEach((opinion, i) => {
+            councilModels.forEach((modelName, i) => {
+                const opinion = state.opinions[i];
                 const div = document.createElement('div');
                 div.className = 'result-section opinion-result';
                 div.dataset.tab = i;
                 div.style.display = state.currentTab == i ? 'block' : 'none';
-                div.innerHTML = `<div class="result-header"><span class="result-badge">🤖</span><span>${opinion.model_name}</span></div><div class="result-content">${formatContent(opinion.content)}</div>`;
+                if (opinion) {
+                    div.innerHTML = `<div class="result-header"><span class="result-badge">🤖</span><span>${opinion.model_name}</span></div><div class="result-content">${formatContent(opinion.content)}</div>`;
+                } else {
+                    div.innerHTML = `<div class="result-header"><span class="result-badge">🤖</span><span>${modelName}</span></div><div class="result-content"><em>${state.isProcessing ? 'Waiting for this member to finish their draft…' : 'No response captured for this member in this run.'}</em></div>`;
+                }
                 messagesContainer.appendChild(div);
             });
 
