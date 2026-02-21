@@ -35,17 +35,17 @@ class Config:
     VENICE_API_KEY: str = os.getenv("VENICE_API_KEY", "")
     VENICE_BASE_URL: str = "https://api.venice.ai/api/v1"
     
-    # Council Models - Customize your council here
-    # Using Kimi as primary for debugging, with other strong models
+    # Council Models - Updated Feb 2026 with confirmed working models
+    # Note: kimi-k2-5 is Private Beta and may be unavailable - using stable alternatives
     COUNCIL_MODELS: List[str] = [
-        "kimi-k2-5",         # Kimi K2.5 - Strong reasoning (primary for debugging)
+        "minimax-m25",       # MiniMax M2.5 - Your default (reliable)
         "claude-sonnet-45",  # Claude Sonnet 4.5 - Balanced
-        "deepseek-v3",       # DeepSeek V3 - Efficient
+        "deepseek-v3.2",     # DeepSeek V3.2 - Efficient
         "grok-41-fast",      # Grok 4.1 Fast - Quick responses
     ]
     
-    # Chairman Model - Produces final response (using Kimi for now)
-    CHAIRMAN_MODEL: str = "kimi-k2-5"
+    # Chairman Model - Produces final response
+    CHAIRMAN_MODEL: str = "minimax-m25"
     
     # App Settings
     APP_NAME: str = "Vivek Council"
