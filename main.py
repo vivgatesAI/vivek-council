@@ -184,19 +184,19 @@ class CouncilEngine:
         progress_callback=None
     ) -> List[Dict[str, Any]]:
         """Stage 1: Get first opinions from all council members"""
-        opinions = []
+        opinions: List[Optional[Dict[str, Any]]] = [None] * len(model_ids)
         
         system_prompt = """You are a member of an LLM Council. 
 Provide a thoughtful, detailed response to the user's question.
 Be accurate, insightful, and consider multiple perspectives.
 Respond in a clear, well-structured manner."""
         
-        for i, model_id in enumerate(model_ids):
+        async def fetch_opinion(index: int, model_id: str) -> tuple[int, Dict[str, Any]]:
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": query}
             ]
-            
+
             try:
                 response = await self.client.chat_completion(
                     model=model_id,
@@ -204,27 +204,34 @@ Respond in a clear, well-structured manner."""
                     temperature=0.7,
                     max_tokens=2000
                 )
-                
+
                 content = response["choices"][0]["message"]["content"]
-                opinions.append({
+                return index, {
                     "model_id": model_id,
                     "model_name": self._get_model_display_name(model_id),
                     "content": content,
-                    "rank": i + 1
-                })
-                
-                if progress_callback:
-                    await progress_callback(int((i + 1) / len(model_ids) * 30))
-                    
+                    "rank": index + 1
+                }
             except Exception as e:
-                opinions.append({
+                return index, {
                     "model_id": model_id,
                     "model_name": self._get_model_display_name(model_id),
                     "content": f"Error: {str(e)}",
                     "error": True
-                })
-        
-        return opinions
+                }
+
+        tasks = [asyncio.create_task(fetch_opinion(i, model_id)) for i, model_id in enumerate(model_ids)]
+        completed = 0
+
+        for task in asyncio.as_completed(tasks):
+            index, opinion = await task
+            opinions[index] = opinion
+            completed += 1
+
+            if progress_callback and model_ids:
+                await progress_callback(int(completed / len(model_ids) * 30))
+
+        return [op for op in opinions if op is not None]
     
     async def get_reviews(
         self,
@@ -234,7 +241,7 @@ Respond in a clear, well-structured manner."""
         progress_callback=None
     ) -> List[Dict[str, Any]]:
         """Stage 2: Have each model review all other responses (anonymized)"""
-        reviews = []
+        reviews: List[Optional[Dict[str, Any]]] = [None] * len(model_ids)
         
         # Prepare anonymized opinions (remove model identifiers)
         anonymized_opinions = []
@@ -267,16 +274,14 @@ RESPONSES TO EVALUATE:
 ---
 YOUR EVALUATION:"""
         
-        for i, model_id in enumerate(model_ids):
-            # Skip if this model had an error
-            if opinions[i].get("error"):
-                continue
-            
+        active_models = [(i, model_id) for i, model_id in enumerate(model_ids) if not opinions[i].get("error")]
+
+        async def fetch_review(index: int, model_id: str) -> tuple[int, Dict[str, Any]]:
             messages = [
                 {"role": "system", "content": "You are an expert evaluator. Be critical but fair."},
                 {"role": "user", "content": review_prompt}
             ]
-            
+
             try:
                 response = await self.client.chat_completion(
                     model=model_id,
@@ -284,27 +289,35 @@ YOUR EVALUATION:"""
                     temperature=0.5,
                     max_tokens=1500
                 )
-                
+
                 content = response["choices"][0]["message"]["content"]
-                reviews.append({
+                return index, {
                     "model_id": model_id,
                     "model_name": self._get_model_display_name(model_id),
                     "content": content,
-                    "response_id": i + 1
-                })
-                
-                if progress_callback:
-                    await progress_callback(30 + int((i + 1) / len(model_ids) * 30))
-                    
+                    "response_id": index + 1
+                }
             except Exception as e:
-                reviews.append({
+                return index, {
                     "model_id": model_id,
                     "model_name": self._get_model_display_name(model_id),
                     "content": f"Error: {str(e)}",
                     "error": True
-                })
-        
-        return reviews
+                }
+
+        tasks = [asyncio.create_task(fetch_review(i, model_id)) for i, model_id in active_models]
+        completed = 0
+        total_reviews = len(tasks)
+
+        for task in asyncio.as_completed(tasks):
+            index, review = await task
+            reviews[index] = review
+            completed += 1
+
+            if progress_callback and total_reviews:
+                await progress_callback(30 + int(completed / total_reviews * 30))
+
+        return [review for review in reviews if review is not None]
     
     async def get_final_response(
         self,
@@ -575,66 +588,71 @@ async def council_query_stream(query: CouncilQuery, request: Request):
             yield f"data: {json.dumps({'stage': 'opinions', 'progress': 0, 'message': 'Starting council analysis...'})}\n\n"
             await asyncio.sleep(1.5)  # Delay to ensure browser renders
             
-            for i, model_id in enumerate(model_ids):
+            opinion_results: List[Optional[Dict[str, Any]]] = [None] * len(model_ids)
+
+            async def fetch_opinion(index: int, model_id: str):
                 model_name = app_state["council_engine"]._get_model_display_name(model_id)
-                
-                # Show which model is currently working
-                msg = model_name + " is formulating their opinion..."
-                status_update = {
-                    "stage": "opinions",
-                    "progress": int(i / len(model_ids) * 30),
-                    "current_model": model_name,
-                    "message": msg,
-                }
-                yield f"data: {json.dumps(status_update)}\n\n"
-                await asyncio.sleep(1.0)  # Delay for browser to render
-                
                 messages = [
                     {"role": "system", "content": """You are a member of an LLM Council. 
 Provide a thoughtful, detailed response to the user's question.
 Be accurate, insightful, and consider multiple perspectives."""},
                     {"role": "user", "content": query.message}
                 ]
-                
+
+                response = await app_state["venice_client"].chat_completion(
+                    model=model_id,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=2000
+                )
+                content = response["choices"][0]["message"]["content"]
+                return index, model_id, model_name, content
+
+            opinion_tasks = []
+            for i, model_id in enumerate(model_ids):
+                model_name = app_state["council_engine"]._get_model_display_name(model_id)
+                opinion_tasks.append(asyncio.create_task(fetch_opinion(i, model_id)))
+                status_update = {
+                    "stage": "opinions",
+                    "progress": int(i / len(model_ids) * 30),
+                    "current_model": model_name,
+                    "message": model_name + " is formulating their opinion...",
+                }
+                yield f"data: {json.dumps(status_update)}\n\n"
+
+            completed_opinions = 0
+            for task in asyncio.as_completed(opinion_tasks):
                 try:
-                    response = await app_state["venice_client"].chat_completion(
-                        model=model_id,
-                        messages=messages,
-                        temperature=0.7,
-                        max_tokens=2000
-                    )
-                    
-                    content = response["choices"][0]["message"]["content"]
+                    index, model_id, model_name, content = await task
                     opinion = {
                         "model_id": model_id,
                         "model_name": model_name,
                         "content": content
                     }
-                    conv.opinions.append(opinion)
-                    
-                    msg = model_name + " submitted their opinion"
+                    opinion_results[index] = opinion
+
+                    completed_opinions += 1
                     opinion_update = {
                         "stage": "opinions",
-                        "progress": int((i + 1) / len(model_ids) * 30),
+                        "progress": int(completed_opinions / len(model_ids) * 30),
                         "current_model": model_name,
-                        "message": msg,
-                        "opinion_index": i,
+                        "message": model_name + " submitted their opinion",
+                        "opinion_index": index,
                         "opinion": opinion,
                     }
                     yield f"data: {json.dumps(opinion_update)}\n\n"
-                    
                 except Exception as e:
+                    completed_opinions += 1
                     error_msg = str(e).replace("'", "\\'").replace("\n", "\\n")
                     error_update = {
                         "stage": "opinions",
-                        "progress": int((i + 1) / len(model_ids) * 30),
-                        "current_model": model_name,
+                        "progress": int(completed_opinions / len(model_ids) * 30),
                         "message": f"Error: {error_msg}",
                         "error": True,
                     }
                     yield f"data: {json.dumps(error_update)}\n\n"
-                
-                await asyncio.sleep(1.0)
+
+            conv.opinions = [op for op in opinion_results if op is not None]
             
             _save_conversation(conv)
             
@@ -657,63 +675,67 @@ RESPONSES:
 ---
 YOUR EVALUATION:"""
             
-            for i, model_id in enumerate(model_ids):
+            review_results: List[Optional[Dict[str, Any]]] = [None] * len(model_ids)
+
+            async def fetch_review(index: int, model_id: str):
                 model_name = app_state["council_engine"]._get_model_display_name(model_id)
-                
-                # Show which model is reviewing
-                msg = model_name + " is reviewing other responses..."
-                review_status_update = {
-                    "stage": "review",
-                    "progress": 30 + int(i / len(model_ids) * 30),
-                    "current_model": model_name,
-                    "message": msg,
-                }
-                yield f"data: {json.dumps(review_status_update)}\n\n"
-                await asyncio.sleep(1.0)
-                
                 messages = [
                     {"role": "system", "content": "You are an expert evaluator."},
                     {"role": "user", "content": review_prompt}
                 ]
-                
+                response = await app_state["venice_client"].chat_completion(
+                    model=model_id,
+                    messages=messages,
+                    temperature=0.5,
+                    max_tokens=1500
+                )
+                content = response["choices"][0]["message"]["content"]
+                return index, model_id, model_name, content
+
+            review_tasks = []
+            for i, model_id in enumerate(model_ids):
+                model_name = app_state["council_engine"]._get_model_display_name(model_id)
+                review_tasks.append(asyncio.create_task(fetch_review(i, model_id)))
+                review_status_update = {
+                    "stage": "review",
+                    "progress": 30 + int(i / len(model_ids) * 30),
+                    "current_model": model_name,
+                    "message": model_name + " is reviewing other responses...",
+                }
+                yield f"data: {json.dumps(review_status_update)}\n\n"
+
+            completed_reviews = 0
+            for task in asyncio.as_completed(review_tasks):
                 try:
-                    response = await app_state["venice_client"].chat_completion(
-                        model=model_id,
-                        messages=messages,
-                        temperature=0.5,
-                        max_tokens=1500
-                    )
-                    
-                    content = response["choices"][0]["message"]["content"]
+                    index, model_id, model_name, content = await task
                     review = {
                         "model_id": model_id,
                         "model_name": model_name,
                         "content": content
                     }
-                    conv.reviews.append(review)
-                    
-                    msg = model_name + " completed their review"
+                    review_results[index] = review
+
+                    completed_reviews += 1
                     review_update = {
                         "stage": "review",
-                        "progress": 30 + int((i + 1) / len(model_ids) * 30),
+                        "progress": 30 + int(completed_reviews / len(model_ids) * 30),
                         "current_model": model_name,
-                        "message": msg,
+                        "message": model_name + " completed their review",
                         "review": review,
                     }
                     yield f"data: {json.dumps(review_update)}\n\n"
-                    
                 except Exception as e:
+                    completed_reviews += 1
                     error_msg = str(e).replace("'", "\\'").replace("\n", "\\n")
                     review_error_update = {
                         "stage": "review",
-                        "progress": 30 + int((i + 1) / len(model_ids) * 30),
-                        "current_model": model_name,
+                        "progress": 30 + int(completed_reviews / len(model_ids) * 30),
                         "message": f"Error: {error_msg}",
                         "error": True,
                     }
                     yield f"data: {json.dumps(review_error_update)}\n\n"
-                
-                await asyncio.sleep(1.0)
+
+            conv.reviews = [review for review in review_results if review is not None]
             
             _save_conversation(conv)
             
