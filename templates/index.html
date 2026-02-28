@@ -110,6 +110,7 @@
                     <span class="progress-text" id="progressText">Processing...</span>
                     <span class="timer" id="timer">00:00</span>
                 </div>
+                <div class="cost-summary" id="costSummary" style="display:none;"></div>
                 <div class="visual-status" id="visualStatus"></div>
             </div>
         </main>
@@ -144,6 +145,7 @@
         const visualStatus = document.getElementById('visualStatus');
         const modelInteraction = document.getElementById('modelInteraction');
         const downloadButton = document.getElementById('downloadButton');
+        const costSummary = document.getElementById('costSummary');
         const stageTrack = document.getElementById('stageTrack');
         const analysisFocus = document.getElementById('analysisFocus');
         const analysisSubtext = document.getElementById('analysisSubtext');
@@ -250,6 +252,42 @@
             analysisDetails.setAttribute('aria-hidden', String(collapsed));
         }
 
+        function renderCostSummary(payload) {
+            const totals = payload?.cost_totals;
+            const items = Array.isArray(payload?.cost_breakdown) ? payload.cost_breakdown : [];
+            if (!totals) return;
+
+            const money = (n) => `$${Number(n || 0).toFixed(6)}`;
+            const num = (n) => Number(n || 0).toLocaleString();
+
+            const rows = items.map((item) => {
+                const chairmanTag = item.is_chairman ? ' <strong>(Chairman)</strong>' : '';
+                return `<tr>
+                    <td>${item.model_name || item.model_id}${chairmanTag}</td>
+                    <td>${item.stage || '-'}</td>
+                    <td>${num(item.prompt_tokens)}</td>
+                    <td>${num(item.completion_tokens)}</td>
+                    <td>${num(item.total_tokens)}</td>
+                    <td>${money(item.total_cost_usd)}</td>
+                </tr>`;
+            }).join('');
+
+            costSummary.innerHTML = `
+                <div class="cost-title">Full Analysis Cost</div>
+                <div class="cost-topline">Total tokens: <strong>${num(totals.total_tokens)}</strong> · Estimated cost: <strong>${money(totals.total_cost_usd)}</strong></div>
+                <div class="cost-sub">Chairman model: <strong>${payload.chairman_name || payload.chairman_model || 'N/A'}</strong></div>
+                <div class="cost-table-wrap">
+                    <table class="cost-table">
+                        <thead>
+                            <tr><th>Model</th><th>Stage</th><th>Input</th><th>Output</th><th>Total</th><th>Cost (USD)</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+            costSummary.style.display = 'block';
+        }
+
         function initializeVisuals() {
             modelInteraction.innerHTML = councilModels.map((name, idx) => `<div class="model-dot" data-model="${idx}" title="${name}">●</div>`).join('') + '<div class="interaction-line"></div>';
             visualStatus.innerHTML = councilModels.map((name, idx) => `
@@ -306,6 +344,8 @@
             state.reviews = [];
             state.finalResponse = '';
             state.currentQuestion = message;
+            costSummary.style.display = 'none';
+            costSummary.innerHTML = '';
             queryInput.value = '';
             downloadButton.disabled = true;
             queryInput.disabled = true;
@@ -409,6 +449,10 @@
                 state.finalResponse = data.final;
                 displayResults();
                 downloadButton.disabled = false;
+            }
+
+            if (data.cost_totals) {
+                renderCostSummary(data);
             }
         }
 

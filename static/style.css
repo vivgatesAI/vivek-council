@@ -441,3 +441,43 @@ body {
     .export-row { justify-content: stretch; }
     .download-button { width: 100%; }
 }
+
+.cost-summary {
+    margin-top: var(--space-2);
+    border: 1px solid var(--gray-200);
+    background: var(--white);
+    padding: var(--space-2);
+}
+.cost-title {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-800);
+    margin-bottom: 6px;
+}
+.cost-topline, .cost-sub {
+    font-size: 0.86rem;
+    color: var(--gray-800);
+    margin-bottom: 6px;
+}
+.cost-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--gray-200);
+}
+.cost-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 640px;
+}
+.cost-table th,
+.cost-table td {
+    border: 1px solid var(--gray-200);
+    padding: 8px;
+    font-size: 0.78rem;
+    text-align: left;
+    white-space: nowrap;
+}
+.cost-table th {
+    background: var(--gray-50);
+    color: var(--gray-800);
+}

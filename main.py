@@ -34,6 +34,14 @@ class Config:
     # Venice API Configuration
     VENICE_API_KEY: str = os.getenv("VENICE_API_KEY", "")
     VENICE_BASE_URL: str = "https://api.venice.ai/api/v1"
+
+    # Model pricing (USD per 1M tokens). Update these as your Venice pricing changes.
+    MODEL_PRICING_PER_1M: Dict[str, Dict[str, float]] = {
+        "minimax-m25": {"input": 0.60, "output": 2.20},
+        "gemini-3-flash-preview": {"input": 0.35, "output": 1.40},
+        "zai-org-glm-5": {"input": 0.50, "output": 2.00},
+        "openai-gpt-52": {"input": 3.00, "output": 12.00},
+    }
     
     # Council Models - Updated Feb 2026 with confirmed working models
     # Note: kimi-k2-5 is Private Beta and may be unavailable - using stable alternatives
@@ -46,6 +54,11 @@ class Config:
     # Chairman Model - Produces final response
     CHAIRMAN_MODEL: str = "openai-gpt-52"
     
+    # Agent instructions
+    OPINION_SYSTEM_PROMPT: str = """You are a member of an LLM Council. Provide a thoughtful, detailed response to the user's question. Be accurate, insightful, and consider multiple perspectives. Respond in a clear, well-structured manner."""
+    REVIEW_SYSTEM_PROMPT: str = "You are an expert evaluator. Be critical but fair."
+    CHAIRMAN_SYSTEM_PROMPT: str = "You are the Chairman of the LLM Council. Produce a final, authoritative response that synthesizes all perspectives."
+
     # App Settings
     APP_NAME: str = "Vivek Council"
     APP_DESCRIPTION: str = "Multiple AI models working together to answer your hardest questions"
@@ -97,8 +110,27 @@ class VeniceClient:
         
         if response.status_code != 200:
             raise Exception(f"Venice API error: {response.status_code} - {response.text}")
+
+        data = response.json()
+        usage = data.get("usage", {}) or {}
+        prompt_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+        completion_tokens = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
+
+        pricing = Config.MODEL_PRICING_PER_1M.get(model, {"input": 0.0, "output": 0.0})
+        input_cost = (prompt_tokens / 1_000_000) * float(pricing.get("input", 0.0))
+        output_cost = (completion_tokens / 1_000_000) * float(pricing.get("output", 0.0))
+
+        data["_cost"] = {
+            "model_id": model,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+            "input_cost_usd": input_cost,
+            "output_cost_usd": output_cost,
+            "total_cost_usd": input_cost + output_cost,
+        }
         
-        return response.json()
+        return data
     
     async def close(self):
         await self.client.aclose()
@@ -131,6 +163,17 @@ class CouncilResponse(BaseModel):
 class Conversation:
     """Conversation storage"""
     
+    @staticmethod
+    def _empty_totals() -> Dict[str, Any]:
+        return {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "input_cost_usd": 0.0,
+            "output_cost_usd": 0.0,
+            "total_cost_usd": 0.0,
+        }
+
     def __init__(self, conversation_id: str):
         self.id = conversation_id
         self.created_at = datetime.now()
@@ -140,6 +183,8 @@ class Conversation:
         self.final_response: str = ""
         self.model_ids: List[str] = []
         self.chairman_model: str = ""
+        self.cost_breakdown: List[Dict[str, Any]] = []
+        self.cost_totals: Dict[str, Any] = Conversation._empty_totals()
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -150,7 +195,9 @@ class Conversation:
             "reviews": self.reviews,
             "final_response": self.final_response,
             "model_ids": self.model_ids,
-            "chairman_model": self.chairman_model
+            "chairman_model": self.chairman_model,
+            "cost_breakdown": self.cost_breakdown,
+            "cost_totals": self.cost_totals,
         }
     
     @classmethod
@@ -163,6 +210,8 @@ class Conversation:
         conv.final_response = data.get("final_response", "")
         conv.model_ids = data.get("model_ids", [])
         conv.chairman_model = data.get("chairman_model", "")
+        conv.cost_breakdown = data.get("cost_breakdown", [])
+        conv.cost_totals = data.get("cost_totals", conv.cost_totals)
         return conv
 
 
@@ -175,6 +224,17 @@ class CouncilEngine:
     
     def __init__(self, venice_client: VeniceClient):
         self.client = venice_client
+
+    @staticmethod
+    def _merge_cost(totals: Dict[str, Any], cost: Optional[Dict[str, Any]]) -> None:
+        if not cost:
+            return
+        totals["prompt_tokens"] = int(totals.get("prompt_tokens", 0)) + int(cost.get("prompt_tokens", 0))
+        totals["completion_tokens"] = int(totals.get("completion_tokens", 0)) + int(cost.get("completion_tokens", 0))
+        totals["total_tokens"] = int(totals.get("total_tokens", 0)) + int(cost.get("total_tokens", 0))
+        totals["input_cost_usd"] = float(totals.get("input_cost_usd", 0.0)) + float(cost.get("input_cost_usd", 0.0))
+        totals["output_cost_usd"] = float(totals.get("output_cost_usd", 0.0)) + float(cost.get("output_cost_usd", 0.0))
+        totals["total_cost_usd"] = float(totals.get("total_cost_usd", 0.0)) + float(cost.get("total_cost_usd", 0.0))
     
     async def get_opinions(
         self, 
@@ -185,10 +245,7 @@ class CouncilEngine:
         """Stage 1: Get first opinions from all council members"""
         opinions: List[Optional[Dict[str, Any]]] = [None] * len(model_ids)
         
-        system_prompt = """You are a member of an LLM Council. 
-Provide a thoughtful, detailed response to the user's question.
-Be accurate, insightful, and consider multiple perspectives.
-Respond in a clear, well-structured manner."""
+        system_prompt = Config.OPINION_SYSTEM_PROMPT
         
         async def fetch_opinion(index: int, model_id: str) -> tuple[int, Dict[str, Any]]:
             messages = [
@@ -349,7 +406,7 @@ Based on the diverse perspectives and critiques above, please produce a final, p
 FINAL RESPONSE:"""
         
         messages = [
-            {"role": "system", "content": "You are the Chairman of the LLM Council. Produce a final, authoritative response that synthesizes all perspectives."},
+            {"role": "system", "content": Config.CHAIRMAN_SYSTEM_PROMPT},
             {"role": "user", "content": summary}
         ]
         
@@ -478,11 +535,29 @@ async def index(request: Request):
 @app.get("/about", response_class=HTMLResponse)
 async def about(request: Request):
     """About page"""
+    pricing_rows = []
+    for model_id in Config.COUNCIL_MODELS + [Config.CHAIRMAN_MODEL]:
+        if any(row["model_id"] == model_id for row in pricing_rows):
+            continue
+        pricing = Config.MODEL_PRICING_PER_1M.get(model_id, {"input": 0.0, "output": 0.0})
+        pricing_rows.append({
+            "model_id": model_id,
+            "model_name": CouncilEngine(None)._get_model_display_name(model_id),
+            "input": pricing.get("input", 0.0),
+            "output": pricing.get("output", 0.0),
+            "is_chairman": model_id == Config.CHAIRMAN_MODEL,
+        })
+
     return templates.TemplateResponse("about.html", {
         "request": request,
         "app_name": Config.APP_NAME,
         "models_list": [CouncilEngine(None)._get_model_display_name(m) for m in Config.COUNCIL_MODELS],
-        "chairman": CouncilEngine(None)._get_model_display_name(Config.CHAIRMAN_MODEL)
+        "chairman": CouncilEngine(None)._get_model_display_name(Config.CHAIRMAN_MODEL),
+        "chairman_model_id": Config.CHAIRMAN_MODEL,
+        "pricing_rows": pricing_rows,
+        "opinion_prompt": Config.OPINION_SYSTEM_PROMPT,
+        "review_prompt": Config.REVIEW_SYSTEM_PROMPT,
+        "chairman_prompt": Config.CHAIRMAN_SYSTEM_PROMPT,
     })
 
 
@@ -592,9 +667,7 @@ async def council_query_stream(query: CouncilQuery, request: Request):
             async def fetch_opinion(index: int, model_id: str):
                 model_name = app_state["council_engine"]._get_model_display_name(model_id)
                 messages = [
-                    {"role": "system", "content": """You are a member of an LLM Council. 
-Provide a thoughtful, detailed response to the user's question.
-Be accurate, insightful, and consider multiple perspectives."""},
+                    {"role": "system", "content": Config.OPINION_SYSTEM_PROMPT},
                     {"role": "user", "content": query.message}
                 ]
 
@@ -605,7 +678,7 @@ Be accurate, insightful, and consider multiple perspectives."""},
                     max_tokens=2000
                 )
                 content = response["choices"][0]["message"]["content"]
-                return index, model_id, model_name, content
+                return index, model_id, model_name, content, response.get("_cost")
 
             opinion_tasks = []
             for i, model_id in enumerate(model_ids):
@@ -622,13 +695,23 @@ Be accurate, insightful, and consider multiple perspectives."""},
             completed_opinions = 0
             for task in asyncio.as_completed(opinion_tasks):
                 try:
-                    index, model_id, model_name, content = await task
+                    index, model_id, model_name, content, cost = await task
                     opinion = {
                         "model_id": model_id,
                         "model_name": model_name,
-                        "content": content
+                        "content": content,
+                        "cost": cost or {},
                     }
                     opinion_results[index] = opinion
+                    conv.cost_breakdown.append({
+                        "stage": "opinions",
+                        "role": "council_member",
+                        "model_id": model_id,
+                        "model_name": model_name,
+                        "is_chairman": False,
+                        **(cost or {}),
+                    })
+                    app_state["council_engine"]._merge_cost(conv.cost_totals, cost)
 
                     completed_opinions += 1
                     opinion_update = {
@@ -679,7 +762,7 @@ YOUR EVALUATION:"""
             async def fetch_review(index: int, model_id: str):
                 model_name = app_state["council_engine"]._get_model_display_name(model_id)
                 messages = [
-                    {"role": "system", "content": "You are an expert evaluator."},
+                    {"role": "system", "content": Config.REVIEW_SYSTEM_PROMPT},
                     {"role": "user", "content": review_prompt}
                 ]
                 response = await app_state["venice_client"].chat_completion(
@@ -689,7 +772,7 @@ YOUR EVALUATION:"""
                     max_tokens=1500
                 )
                 content = response["choices"][0]["message"]["content"]
-                return index, model_id, model_name, content
+                return index, model_id, model_name, content, response.get("_cost")
 
             review_tasks = []
             for i, model_id in enumerate(model_ids):
@@ -706,13 +789,23 @@ YOUR EVALUATION:"""
             completed_reviews = 0
             for task in asyncio.as_completed(review_tasks):
                 try:
-                    index, model_id, model_name, content = await task
+                    index, model_id, model_name, content, cost = await task
                     review = {
                         "model_id": model_id,
                         "model_name": model_name,
-                        "content": content
+                        "content": content,
+                        "cost": cost or {},
                     }
                     review_results[index] = review
+                    conv.cost_breakdown.append({
+                        "stage": "review",
+                        "role": "council_member",
+                        "model_id": model_id,
+                        "model_name": model_name,
+                        "is_chairman": False,
+                        **(cost or {}),
+                    })
+                    app_state["council_engine"]._merge_cost(conv.cost_totals, cost)
 
                     completed_reviews += 1
                     review_update = {
@@ -764,7 +857,7 @@ REVIEWS:
 Produce a final response synthesizing all perspectives."""
 
             messages = [
-                {"role": "system", "content": "You are the Chairman. Produce a final, polished response."},
+                {"role": "system", "content": Config.CHAIRMAN_SYSTEM_PROMPT},
                 {"role": "user", "content": summary}
             ]
             
@@ -777,6 +870,17 @@ Produce a final response synthesizing all perspectives."""
                 )
                 
                 content = response["choices"][0]["message"]["content"]
+                final_cost = response.get("_cost")
+                conv.cost_breakdown.append({
+                    "stage": "final",
+                    "role": "chairman",
+                    "model_id": chairman,
+                    "model_name": chairman_name,
+                    "is_chairman": True,
+                    **(final_cost or {}),
+                })
+                app_state["council_engine"]._merge_cost(conv.cost_totals, final_cost)
+
                 conv.final_response = content
                 _save_conversation(conv)
 
@@ -806,6 +910,10 @@ Produce a final response synthesizing all perspectives."""
                     "message": msg,
                     "final": content,
                     "conversation_id": conversation_id,
+                    "cost_breakdown": conv.cost_breakdown,
+                    "cost_totals": conv.cost_totals,
+                    "chairman_model": chairman,
+                    "chairman_name": chairman_name,
                 }
                 yield f"data: {json.dumps(completion_update)}\n\n"
                 

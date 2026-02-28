@@ -4,462 +4,111 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About - {{ app_name }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
     <style>
-        .about-page {
-            height: 100vh;
-            background: var(--bg-primary);
-            overflow-y: auto;
-            overflow-x: hidden;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: thin;
-            scrollbar-color: var(--bg-elevated) transparent;
+        :root {
+            --white: #FFFFFF;
+            --black: #000000;
+            --gray-50: #F8F8F8;
+            --gray-200: #E0E0E0;
+            --gray-800: #333333;
+            --pink: #FF1493;
+            --cyan: #00CED1;
+            --gold: #FFD700;
+            --violet: #8B008B;
+            --orange: #FF4500;
+            --font-main: "Söhne", "Sohne", "Inter", "Helvetica Neue", Arial, sans-serif;
         }
-        
-        .about-page::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .about-page::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        
-        .about-page::-webkit-scrollbar-thumb {
-            background: var(--bg-elevated);
-            border-radius: 4px;
-        }
-        
-        .about-hero {
-            text-align: center;
-            padding: var(--space-2xl) var(--space-lg);
-            background: 
-                radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 60%),
-                var(--bg-primary);
-            position: relative;
-        }
-        
-        .about-hero::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
-            pointer-events: none;
-        }
-        
-        .back-link {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--space-sm);
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.9rem;
-            margin-bottom: var(--space-xl);
-            transition: color 0.2s;
-        }
-        
-        .back-link:hover {
-            color: var(--accent-primary);
-        }
-        
-        .hero-logo {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto var(--space-lg);
-            background: var(--accent-gradient);
-            border-radius: var(--radius-lg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.5rem;
-            box-shadow: var(--shadow-glow);
-        }
-        
-        .about-hero h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: var(--space-md);
-            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-primary) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .about-hero .tagline {
-            font-size: 1.25rem;
-            color: var(--text-secondary);
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        
-        .about-content {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 0 var(--space-lg) var(--space-2xl);
-        }
-        
-        .process-section {
-            margin-bottom: var(--space-2xl);
-        }
-        
-        .section-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: var(--space-lg);
-            display: flex;
-            align-items: center;
-            gap: var(--space-md);
-        }
-        
-        .section-title .number {
-            width: 40px;
-            height: 40px;
-            background: var(--accent-gradient);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: white;
-        }
-        
-        .stage-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            padding: var(--space-lg);
-            margin-bottom: var(--space-md);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .stage-card::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: var(--accent-gradient);
-        }
-        
-        .stage-card h3 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: var(--space-sm);
-            display: flex;
-            align-items: center;
-            gap: var(--space-sm);
-        }
-        
-        .stage-card .stage-icon {
-            font-size: 1.5rem;
-        }
-        
-        .stage-card p {
-            color: var(--text-secondary);
-            line-height: 1.7;
-        }
-        
-        .stage-card .models-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: var(--space-sm);
-            margin-top: var(--space-md);
-        }
-        
-        .debate-steps {
-            list-style: none;
-            padding: 0;
-            margin: var(--space-md) 0;
-        }
-        
-        .debate-steps li {
-            padding: var(--space-sm) 0;
-            color: var(--text-secondary);
-            display: flex;
-            align-items: flex-start;
-            gap: var(--space-sm);
-        }
-        
-        .stage-card .model-tag {
-            padding: var(--space-xs) var(--space-md);
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-xl);
-            font-size: 0.8rem;
-            color: var(--accent-primary);
-            font-weight: 500;
-        }
-        
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: var(--space-lg);
-            margin-bottom: var(--space-2xl);
-        }
-        
-        .feature-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            padding: var(--space-lg);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-lg);
-        }
-        
-        .feature-card .icon {
-            width: 48px;
-            height: 48px;
-            background: var(--accent-gradient);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            margin-bottom: var(--space-md);
-        }
-        
-        .feature-card h3 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: var(--space-sm);
-        }
-        
-        .feature-card p {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }
-        
-        .tech-section {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            padding: var(--space-xl);
-            text-align: center;
-        }
-        
-        .tech-section h2 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: var(--space-lg);
-        }
-        
-        .tech-logos {
-            display: flex;
-            justify-content: center;
-            gap: var(--space-xl);
-            flex-wrap: wrap;
-        }
-        
-        .tech-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: var(--space-sm);
-        }
-        
-        .tech-item .logo {
-            width: 60px;
-            height: 60px;
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-        }
-        
-        .tech-item span {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-        
-        .cta-section {
-            text-align: center;
-            padding: var(--space-2xl);
-            background: 
-                radial-gradient(ellipse at 50% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 60%),
-                var(--bg-secondary);
-            border-radius: var(--radius-lg);
-            margin-top: var(--space-2xl);
-        }
-        
-        .cta-section h2 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            margin-bottom: var(--space-md);
-        }
-        
-        .cta-section p {
-            color: var(--text-secondary);
-            margin-bottom: var(--space-lg);
-        }
-        
-        .cta-button {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--space-sm);
-            padding: var(--space-md) var(--space-xl);
-            background: var(--accent-gradient);
-            border: none;
-            border-radius: var(--radius-md);
-            color: white;
-            font-family: var(--font-sans);
-            font-size: 1rem;
-            font-weight: 600;
-            text-decoration: none;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .cta-button:hover {
-            transform: scale(1.05);
-            box-shadow: var(--shadow-glow);
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body { font-family: var(--font-main); color: var(--black); background: var(--white); }
+        .page { height: 100vh; overflow-y: auto; }
+        .page::-webkit-scrollbar { width: 10px; }
+        .page::-webkit-scrollbar-thumb { background: var(--gray-200); }
+        .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+        .top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 28px; }
+        .back { text-decoration: none; color: var(--gray-800); border: 1px solid var(--gray-200); padding: 8px 12px; }
+        .back:hover { border-color: var(--black); color: var(--black); }
+        h1 { font-size: 2rem; font-weight: 600; letter-spacing: 0.01em; }
+        .sub { color: var(--gray-800); margin-top: 6px; max-width: 760px; }
+        .section { margin-top: 28px; border: 1px solid var(--gray-200); background: var(--gray-50); }
+        .section-head { padding: 14px 16px; border-bottom: 1px solid var(--gray-200); font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-800); }
+        .section-body { padding: 18px 16px; }
+        .cards { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+        .card { border: 1px solid var(--gray-200); background: var(--white); padding: 14px; }
+        .card h3 { font-size: 1rem; margin-bottom: 8px; }
+        .card p { color: var(--gray-800); font-size: 0.92rem; line-height: 1.55; white-space: pre-wrap; }
+        table { width: 100%; border-collapse: collapse; background: var(--white); }
+        th, td { border: 1px solid var(--gray-200); padding: 10px; text-align: left; font-size: 0.88rem; }
+        th { background: var(--gray-50); color: var(--gray-800); font-weight: 600; }
+        .tag { display: inline-block; border: 1px solid var(--gray-200); padding: 2px 8px; font-size: 0.72rem; color: var(--gray-800); }
+        .chair { border-color: var(--violet); color: var(--violet); }
+        .note { margin-top: 10px; font-size: 0.82rem; color: var(--gray-800); }
+        @media (max-width: 900px) { .cards { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
-    <div class="about-page">
-        <div class="about-hero">
-            <a href="/" class="back-link">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
-                </svg>
-                Back to Council
-            </a>
-            <div class="hero-logo">🏛️</div>
-            <h1>{{ app_name }}</h1>
-            <p class="tagline">Multiple AI models working together to answer your hardest questions through structured debate and synthesis</p>
+<div class="page">
+    <div class="wrap">
+        <div class="top">
+            <a class="back" href="/">← Back to Council</a>
         </div>
-        
-        <div class="about-content">
-            <div class="process-section">
-                <h2 class="section-title">
-                    <span class="number">1</span>
-                    How It Works
-                </h2>
-                
-                <div class="stage-card">
-                    <h3><span class="stage-icon">💭</span> Stage 1: First Opinions</h3>
-                    <p>Your question is sent to all council models simultaneously. Each AI model provides their own unique response based on their training, knowledge, and reasoning approach. This gives you diverse perspectives right from the start.</p>
-                    <div class="models-list">
-                        {% for model in models_list %}
-                        <span class="model-tag">{{ model }}</span>
+
+        <h1>{{ app_name }} · About</h1>
+        <p class="sub">A transparent, scrollable reference for how each agent is instructed, which model is the chairman, and how token/cost accounting is calculated for a full run.</p>
+
+        <section class="section">
+            <div class="section-head">Agent Instructions</div>
+            <div class="section-body">
+                <div class="cards">
+                    <article class="card">
+                        <h3>Council Member (First Opinion)</h3>
+                        <p>{{ opinion_prompt }}</p>
+                    </article>
+                    <article class="card">
+                        <h3>Council Member (Cross-Review)</h3>
+                        <p>{{ review_prompt }}</p>
+                    </article>
+                    <article class="card">
+                        <h3>Chairman (Final Synthesis)</h3>
+                        <p>{{ chairman_prompt }}</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-head">Active Models and Pricing</div>
+            <div class="section-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Role</th>
+                            <th>Input Cost (USD / 1M tokens)</th>
+                            <th>Output Cost (USD / 1M tokens)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in pricing_rows %}
+                        <tr>
+                            <td>{{ row.model_name }} <span class="tag">{{ row.model_id }}</span></td>
+                            <td>
+                                {% if row.is_chairman %}
+                                    <span class="tag chair">Chairman</span>
+                                {% else %}
+                                    <span class="tag">Council</span>
+                                {% endif %}
+                            </td>
+                            <td>${{ "%.4f"|format(row.input) }}</td>
+                            <td>${{ "%.4f"|format(row.output) }}</td>
+                        </tr>
                         {% endfor %}
-                    </div>
-                </div>
-                
-                <div class="stage-card">
-                    <h3><span class="stage-icon">🔄</span> Stage 2: Cross Review (The Debate)</h3>
-                    <p><strong>How the debate works:</strong></p>
-                    <ul class="debate-steps">
-                        <li>📋 Each model receives all other responses <em>anonymized</em> (they don't know which model said what)</li>
-                        <li>🎯 Models evaluate responses on accuracy, insight, and clarity</li>
-                        <li>🏆 They rank the best and worst responses with explanations</li>
-                        <li>✍️ Each model writes their own improved answer incorporating the best ideas</li>
-                    </ul>
-                    <p>This creates a <strong>collaborative debate</strong> where models challenge and learn from each other!</p>
-                </div>
-                
-                <div class="stage-card">
-                    <h3><span class="stage-icon">✨</span> Stage 3: Final Synthesis</h3>
-                    <p>The Chairman model reviews all opinions and critiques to produce a final, polished response that incorporates the strongest insights, addresses criticisms, and provides a comprehensive answer.</p>
-                    <div class="models-list">
-                        <span class="model-tag">{{ chairman }} (Chairman)</span>
-                    </div>
-                </div>
+                    </tbody>
+                </table>
+                <p class="note">Full analysis total is computed as the sum of all opinion calls + review calls + final chairman call, including per-call input/output token usage.</p>
             </div>
-            
-            <div class="process-section">
-                <h2 class="section-title">
-                    <span class="number">2</span>
-                    Key Features
-                </h2>
-                
-                <div class="features-grid">
-                    <div class="feature-card">
-                        <div class="icon">🎯</div>
-                        <h3>Multi-Perspective Answers</h3>
-                        <p>Get insights from multiple AI models, each bringing their unique reasoning and knowledge base to your question.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="icon">🔄</div>
-                        <h3>Iterative Refinement</h3>
-                        <p>Models review and critique each other's responses, leading to more accurate and well-rounded answers.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="icon">📊</div>
-                        <h3>Real-Time Progress</h3>
-                        <p>Watch the council work through each stage with live updates showing which model is currently thinking.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="icon">🏆</div>
-                        <h3>Expert Chairman</h3>
-                        <p>A designated chairman model synthesizes all perspectives into a final authoritative answer.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="icon">👀</div>
-                        <h3>Transparent Process</h3>
-                        <p>Explore individual model opinions and cross-reviews in separate tabs to see the full deliberation.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="icon">⚡</div>
-                        <h3>Powered by Venice AI</h3>
-                        <p>Leverages Venice API for fast, private inference on frontier AI models.</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="tech-section">
-                <h2>Built With</h2>
-                <div class="tech-logos">
-                    <div class="tech-item">
-                        <div class="logo">🐍</div>
-                        <span>FastAPI</span>
-                    </div>
-                    <div class="tech-item">
-                        <div class="logo">⚡</div>
-                        <span>Venice AI</span>
-                    </div>
-                    <div class="tech-item">
-                        <div class="logo">🚀</div>
-                        <span>Railway</span>
-                    </div>
-                    <div class="tech-item">
-                        <div class="logo">🎨</div>
-                        <span>Vanilla JS</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="cta-section">
-                <h2>Ready to Ask the Council?</h2>
-                <p>Submit your question and let multiple AI minds collaborate on the best answer.</p>
-                <a href="/" class="cta-button">
-                    Launch Council
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                </a>
-            </div>
-        </div>
+        </section>
     </div>
+</div>
 </body>
 </html>
