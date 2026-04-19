@@ -45,15 +45,25 @@
             <div class="council-config">
                 <div class="config-section">
                     <h3>Council Members</h3>
-                    <div class="model-chips" id="modelChips">
-                        {% for model in model_names %}
-                        <span class="chip" data-model-name="{{ model }}">{{ model }}</span>
-                        {% endfor %}
+                    <div class="model-chips" id="modelChips"></div>
+                    <div class="model-selector">
+                        <button id="modelSelectorToggle" class="model-selector-toggle" type="button" aria-expanded="false" aria-controls="modelSelectorPanel">
+                            Choose council members
+                        </button>
+                        <div id="modelSelectorPanel" class="model-selector-panel" hidden>
+                            <input id="modelSearchInput" class="model-search-input" type="text" placeholder="Search models..." />
+                            <div id="modelOptions" class="model-options"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="config-section">
                     <h3>Chairman</h3>
-                    <div class="chairman-badge">{{ models|length + 1 }} model council</div>
+                    <select id="chairmanSelect" style="width:100%; padding:8px; border-radius:8px; border:1px solid #ddd; margin-bottom:8px;">
+                        {% for model in available_models %}
+                        <option value="{{ model.id }}" {% if model.id == chairman %}selected{% endif %}>{{ model.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="chairman-badge" id="councilSizeBadge">{{ models|length + 1 }} model council</div>
                 </div>
             </div>
 
@@ -119,16 +129,17 @@
             <div class="sidebar-header"><h3>Council Tabs</h3></div>
             <div class="tabs" id="tabs">
                 <button class="tab active" data-tab="final"><span class="tab-icon">🏆</span>Final Answer</button>
-                {% for model in model_names %}
-                <button class="tab" data-tab="{{ loop.index0 }}"><span class="tab-icon">🤖</span>{{ model }}</button>
-                {% endfor %}
                 <button class="tab" data-tab="reviews"><span class="tab-icon">📋</span>Reviews</button>
             </div>
         </aside>
     </div>
 
     <script>
-        const councilModels = {{ model_names|tojson }};
+        const availableModels = {{ available_models|tojson }};
+        const defaultCouncilModelIds = {{ models|tojson }};
+        const modelNameById = Object.fromEntries(availableModels.map(m => [m.id, m.name]));
+        let councilModelIds = [...defaultCouncilModelIds];
+        let councilModels = councilModelIds.map(id => modelNameById[id] || id);
         const state = {
             messages: [], opinions: [], reviews: [], finalResponse: '', currentTab: 'final',
             isProcessing: false, activeModel: '', stage: 'idle', streamBuffer: '', currentQuestion: ''
@@ -154,6 +165,52 @@
         const analysisDeck = document.getElementById('analysisDeck');
         const analysisToggle = document.getElementById('analysisToggle');
         const analysisDetails = document.getElementById('analysisDetails');
+        const chairmanSelect = document.getElementById('chairmanSelect');
+        const councilSizeBadge = document.getElementById('councilSizeBadge');
+        const modelSelectorToggle = document.getElementById('modelSelectorToggle');
+        const modelSelectorPanel = document.getElementById('modelSelectorPanel');
+        const modelSearchInput = document.getElementById('modelSearchInput');
+        const modelOptions = document.getElementById('modelOptions');
+
+        function renderModelOptions() {
+            const query = (modelSearchInput.value || '').toLowerCase().trim();
+            modelOptions.innerHTML = availableModels
+                .filter((model) => !query || model.name.toLowerCase().includes(query) || model.id.toLowerCase().includes(query))
+                .map((model) => {
+                    const checked = councilModelIds.includes(model.id) ? 'checked' : '';
+                    return `<label class="model-option"><input type="checkbox" class="model-checkbox" value="${model.id}" ${checked}><span>${model.name}</span></label>`;
+                })
+                .join('');
+        }
+
+        function getSelectedModelIds() {
+            return Array.from(document.querySelectorAll('.model-checkbox:checked')).map(el => el.value);
+        }
+
+        function refreshSelectionState() {
+            councilModelIds = getSelectedModelIds();
+            councilModels = councilModelIds.map(id => modelNameById[id] || id);
+            const total = councilModels.length + 1;
+            councilSizeBadge.textContent = `${total} model council`;
+            modelSelectorToggle.textContent = `Council members (${councilModels.length} selected)`;
+            renderModelChips();
+            renderTabs();
+        }
+
+        function renderModelChips() {
+            modelChips.innerHTML = councilModels.map((model) => `<span class="chip" data-model-name="${model}">${model}</span>`).join('');
+        }
+
+        function renderTabs() {
+            const modelTabs = councilModels.map((model, i) => `<button class="tab ${String(state.currentTab) === String(i) ? 'active' : ''}" data-tab="${i}"><span class="tab-icon">🤖</span>${model}</button>`).join('');
+            tabsContainer.innerHTML = `<button class="tab ${state.currentTab === 'final' ? 'active' : ''}" data-tab="final"><span class="tab-icon">🏆</span>Final Answer</button>${modelTabs}<button class="tab ${state.currentTab === 'reviews' ? 'active' : ''}" data-tab="reviews"><span class="tab-icon">📋</span>Reviews</button>`;
+            if (state.currentTab !== 'final' && state.currentTab !== 'reviews') {
+                const idx = Number(state.currentTab);
+                if (!Number.isFinite(idx) || idx >= councilModels.length) {
+                    state.currentTab = 'final';
+                }
+            }
+        }
 
         function normalizeModelName(name) {
             return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -310,6 +367,32 @@
             const shouldCollapse = !analysisDeck.classList.contains('collapsed');
             setAnalysisCollapsed(shouldCollapse);
         });
+        modelSelectorToggle.addEventListener('click', () => {
+            const isOpen = !modelSelectorPanel.hidden;
+            modelSelectorPanel.hidden = isOpen;
+            modelSelectorToggle.setAttribute('aria-expanded', String(!isOpen));
+        });
+        modelSearchInput.addEventListener('input', renderModelOptions);
+        modelOptions.addEventListener('change', (event) => {
+            const checkbox = event.target.closest('.model-checkbox');
+            if (!checkbox) return;
+            const selected = getSelectedModelIds();
+            if (!selected.length) {
+                checkbox.checked = true;
+                return;
+            }
+            councilModelIds = selected;
+            refreshSelectionState();
+        });
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('.model-selector')) {
+                modelSelectorPanel.hidden = true;
+                modelSelectorToggle.setAttribute('aria-expanded', 'false');
+            }
+        });
+        chairmanSelect.addEventListener('change', refreshSelectionState);
+        renderModelOptions();
+        refreshSelectionState();
         setAnalysisCollapsed(false);
 
         let timerInterval = null;
@@ -363,7 +446,11 @@
                 const response = await fetch('/api/council/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
+                    body: JSON.stringify({
+                        message,
+                        model_ids: councilModelIds,
+                        chairman_model: chairmanSelect.value
+                    })
                 });
 
                 if (!response.ok || !response.body) {
