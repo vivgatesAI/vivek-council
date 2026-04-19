@@ -46,14 +46,13 @@
                 <div class="config-section">
                     <h3>Council Members</h3>
                     <div class="model-chips" id="modelChips"></div>
-                    <div class="model-selector">
-                        <button id="modelSelectorToggle" class="model-selector-toggle" type="button" aria-expanded="false" aria-controls="modelSelectorPanel">
-                            Choose council members
-                        </button>
-                        <div id="modelSelectorPanel" class="model-selector-panel" hidden>
-                            <input id="modelSearchInput" class="model-search-input" type="text" placeholder="Search models..." />
-                            <div id="modelOptions" class="model-options"></div>
-                        </div>
+                    <div style="margin-top:10px; display:grid; gap:6px;">
+                        {% for model in available_models %}
+                        <label style="font-size:13px; display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" class="model-checkbox" value="{{ model.id }}" {% if model.id in models %}checked{% endif %}>
+                            <span>{{ model.name }}</span>
+                        </label>
+                        {% endfor %}
                     </div>
                 </div>
                 <div class="config-section">
@@ -136,9 +135,8 @@
 
     <script>
         const availableModels = {{ available_models|tojson }};
-        const defaultCouncilModelIds = {{ models|tojson }};
         const modelNameById = Object.fromEntries(availableModels.map(m => [m.id, m.name]));
-        let councilModelIds = [...defaultCouncilModelIds];
+        let councilModelIds = Array.from(document.querySelectorAll('.model-checkbox:checked')).map(el => el.value);
         let councilModels = councilModelIds.map(id => modelNameById[id] || id);
         const state = {
             messages: [], opinions: [], reviews: [], finalResponse: '', currentTab: 'final',
@@ -167,21 +165,6 @@
         const analysisDetails = document.getElementById('analysisDetails');
         const chairmanSelect = document.getElementById('chairmanSelect');
         const councilSizeBadge = document.getElementById('councilSizeBadge');
-        const modelSelectorToggle = document.getElementById('modelSelectorToggle');
-        const modelSelectorPanel = document.getElementById('modelSelectorPanel');
-        const modelSearchInput = document.getElementById('modelSearchInput');
-        const modelOptions = document.getElementById('modelOptions');
-
-        function renderModelOptions() {
-            const query = (modelSearchInput.value || '').toLowerCase().trim();
-            modelOptions.innerHTML = availableModels
-                .filter((model) => !query || model.name.toLowerCase().includes(query) || model.id.toLowerCase().includes(query))
-                .map((model) => {
-                    const checked = councilModelIds.includes(model.id) ? 'checked' : '';
-                    return `<label class="model-option"><input type="checkbox" class="model-checkbox" value="${model.id}" ${checked}><span>${model.name}</span></label>`;
-                })
-                .join('');
-        }
 
         function getSelectedModelIds() {
             return Array.from(document.querySelectorAll('.model-checkbox:checked')).map(el => el.value);
@@ -192,7 +175,6 @@
             councilModels = councilModelIds.map(id => modelNameById[id] || id);
             const total = councilModels.length + 1;
             councilSizeBadge.textContent = `${total} model council`;
-            modelSelectorToggle.textContent = `Council members (${councilModels.length} selected)`;
             renderModelChips();
             renderTabs();
         }
@@ -367,31 +349,17 @@
             const shouldCollapse = !analysisDeck.classList.contains('collapsed');
             setAnalysisCollapsed(shouldCollapse);
         });
-        modelSelectorToggle.addEventListener('click', () => {
-            const isOpen = !modelSelectorPanel.hidden;
-            modelSelectorPanel.hidden = isOpen;
-            modelSelectorToggle.setAttribute('aria-expanded', String(!isOpen));
-        });
-        modelSearchInput.addEventListener('input', renderModelOptions);
-        modelOptions.addEventListener('change', (event) => {
-            const checkbox = event.target.closest('.model-checkbox');
-            if (!checkbox) return;
-            const selected = getSelectedModelIds();
-            if (!selected.length) {
-                checkbox.checked = true;
-                return;
-            }
-            councilModelIds = selected;
-            refreshSelectionState();
-        });
-        document.addEventListener('click', (event) => {
-            if (!event.target.closest('.model-selector')) {
-                modelSelectorPanel.hidden = true;
-                modelSelectorToggle.setAttribute('aria-expanded', 'false');
-            }
+        document.querySelectorAll('.model-checkbox').forEach((checkbox) => {
+            checkbox.addEventListener('change', () => {
+                const selected = getSelectedModelIds();
+                if (!selected.length) {
+                    checkbox.checked = true;
+                    return;
+                }
+                refreshSelectionState();
+            });
         });
         chairmanSelect.addEventListener('change', refreshSelectionState);
-        renderModelOptions();
         refreshSelectionState();
         setAnalysisCollapsed(false);
 
