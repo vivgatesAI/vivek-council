@@ -131,6 +131,25 @@ class VeniceClient:
         }
         
         return data
+
+    async def list_text_models(self) -> List[Dict[str, Any]]:
+        """Fetch available text models from Venice API"""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        response = await self.client.get(
+            f"{self.base_url}/models",
+            params={"type": "text"},
+            headers=headers
+        )
+        if response.status_code != 200:
+            raise Exception(f"Venice API error: {response.status_code} - {response.text}")
+        payload = response.json()
+        models = payload.get("data", payload if isinstance(payload, list) else [])
+        if not isinstance(models, list):
+            return []
+        return models
     
     async def close(self):
         await self.client.aclose()
@@ -523,12 +542,38 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Main page"""
+    model_rows: List[Dict[str, str]] = []
+    try:
+        if app_state["venice_client"] and Config.VENICE_API_KEY:
+            models = await app_state["venice_client"].list_text_models()
+            for model in models:
+                model_id = model.get("id")
+                if not model_id:
+                    continue
+                model_rows.append({
+                    "id": model_id,
+                    "name": CouncilEngine(None)._get_model_display_name(model_id)
+                })
+    except Exception:
+        model_rows = []
+
+    if not model_rows:
+        fallback_models = []
+        for model_id in Config.COUNCIL_MODELS + [Config.CHAIRMAN_MODEL]:
+            if model_id not in fallback_models:
+                fallback_models.append(model_id)
+        model_rows = [
+            {"id": model_id, "name": CouncilEngine(None)._get_model_display_name(model_id)}
+            for model_id in fallback_models
+        ]
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "app_name": Config.APP_NAME,
         "models": Config.COUNCIL_MODELS,
         "chairman": Config.CHAIRMAN_MODEL,
-        "model_names": [CouncilEngine(None)._get_model_display_name(m) for m in Config.COUNCIL_MODELS]
+        "model_names": [CouncilEngine(None)._get_model_display_name(m) for m in Config.COUNCIL_MODELS],
+        "available_models": model_rows,
     })
 
 
